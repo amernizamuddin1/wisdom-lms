@@ -1,0 +1,231 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Default brand palette — Light Mode. Overridden at runtime by
+     admin-configured brand colors (see src/app/layout.tsx). */
+  --background: #f7f8fa;
+  --background-page: #fafbfc;
+  --foreground: #181a20;
+  --card: #ffffff;
+  --card-foreground: #181a20;
+  --popover: #ffffff;
+  --popover-foreground: #181a20;
+
+  --primary: #6548e8;
+  --primary-hover: #583bcf;
+  --primary-pressed: #4930b3;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f1eeff;
+  --secondary-foreground: #5138c7;
+
+  --muted: #f4f5f7;
+  --muted-foreground: #515563;
+
+  --surface-secondary: #f4f5f7;
+  --surface-tertiary: #eceef2;
+  --surface-brand-subtle: #f5f3ff;
+
+  --text-tertiary: #747986;
+  --text-disabled: #a7abb4;
+  --text-brand: #6548e8;
+
+  --accent: #f59e42;
+  --accent-hover: #e98a27;
+  --accent-foreground: #ffffff;
+  --accent-soft: #fff4e5;
+
+  --indigo: #6548e8;
+
+  --success: #16a36a;
+  --success-soft: #eaf8f1;
+  --warning: #e99a18;
+  --warning-soft: #fff7e5;
+  --destructive: #e5484d;
+  --destructive-soft: #fff0f0;
+  --info: #3b82f6;
+  --info-soft: #eff6ff;
+
+  --border: #e2e4e9;
+  --border-strong: #d2d5dc;
+  --border-subtle: #eceef2;
+  --input: #dfe2e7;
+  --ring: #7c5cfc;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #181a20;
+  --sidebar-primary: #6548e8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1eeff;
+  --sidebar-accent-foreground: #5138c7;
+  --sidebar-border: #e2e4e9;
+  --sidebar-ring: #7c5cfc;
+
+  --radius: 0.75rem;
+}
+
+.dark {
+  /* Default brand palette — Dark Mode. Deep neutral charcoal surfaces, not an
+     inverted light theme, so the violet brand color reads distinctly.
+     Overridden at runtime by admin-configured brand colors. */
+  --background: #0e0f13;
+  --background-page: #121318;
+  --foreground: #f4f5f7;
+  --card: #181a21;
+  --card-foreground: #f4f5f7;
+  --popover: #181a21;
+  --popover-foreground: #f4f5f7;
+
+  --primary: #8068ff;
+  --primary-hover: #927fff;
+  --primary-pressed: #6f56e8;
+  --primary-foreground: #ffffff;
+
+  --secondary: #25203d;
+  --secondary-foreground: #b6a6ff;
+
+  --muted: #20222b;
+  --muted-foreground: #b8bbc5;
+
+  --surface-secondary: #20222b;
+  --surface-tertiary: #292c36;
+  --surface-brand-subtle: #25203d;
+
+  --text-tertiary: #8d919d;
+  --text-disabled: #5f636e;
+  --text-brand: #a994ff;
+
+  --accent: #f59e42;
+  --accent-hover: #e98a27;
+  --accent-foreground: #0f0f11;
+  --accent-soft: #33270f;
+
+  --indigo: #8068ff;
+
+  --success: #35c98b;
+  --success-soft: #10261d;
+  --warning: #e99a18;
+  --warning-soft: #2c2210;
+  --destructive: #ff6369;
+  --destructive-soft: #2c1416;
+  --info: #3b82f6;
+  --info-soft: #101d2c;
+
+  --border: #2c2f38;
+  --border-strong: #3a3d48;
+  --border-subtle: #252730;
+  --input: #343741;
+  --ring: #8068ff;
+
+  --sidebar: #121318;
+  --sidebar-foreground: #f4f5f7;
+  --sidebar-primary: #8068ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #292244;
+  --sidebar-accent-foreground: #b6a6ff;
+  --sidebar-border: #2c2f38;
+  --sidebar-ring: #8068ff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-background-page: var(--background-page);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-pressed: var(--primary-pressed);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-tertiary: var(--surface-tertiary);
+  --color-surface-brand-subtle: var(--surface-brand-subtle);
+
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-brand: var(--text-brand);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-indigo: var(--indigo);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-subtle: var(--border-subtle);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-inter);
+  --font-body: var(--font-inter);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    outline-color: color-mix(in oklab, var(--color-ring) 50%, transparent);
+  }
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+/* Login page decorative background — slow drifting blurred gradient forms.
+   Scoped to these class names only; inert (no animation) whenever the user
+   prefers reduced motion, since motion-safe: only applies the animate-*
+   utility under `@media (prefers-reduced-motion: no-preference)`. */
+@keyframes login-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4%, -6%) scale(1.08); }
+}
+@keyframes login-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-5%, 5%) scale(1.06); }
+}
+@keyframes login-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(3%, 4%) scale(1.1); }
+}
+@keyframes login-card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
