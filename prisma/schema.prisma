@@ -1,0 +1,1998 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum CourseLearningStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum Currency {
+  INR
+  USD
+  EUR
+}
+
+enum VideoSource {
+  YOUTUBE
+  VIMEO
+}
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  ALL_LEVELS
+}
+
+enum CommunicationAudienceType {
+  ALL_USERS
+  ALL_ENROLLED
+  COURSES
+  BUNDLES
+  MANUAL
+  MIXED
+}
+
+enum EmailCampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+}
+
+enum EmailRecipientStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+enum NotificationStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  EXPIRED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum PaymentGateway {
+  RAZORPAY
+  STRIPE
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  FILL_BLANK
+}
+
+enum LessonType {
+  VIDEO
+  AUDIO
+  TEXT
+}
+
+enum BundleStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+enum EnrollmentSource {
+  DIRECT
+  BUNDLE
+  ADMIN_ASSIGNED
+  CSV_IMPORT
+  FREE_CHECKOUT
+}
+
+enum CartItemType {
+  COURSE
+  BUNDLE
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum OrderPaymentMethod {
+  RAZORPAY
+  FREE
+}
+
+enum ImportJobType {
+  USER_BULK
+  QUIZ
+}
+
+enum ImportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum CouponScope {
+  ALL
+  SPECIFIC
+}
+
+enum TenantStatus {
+  ACTIVE
+  PAUSED
+  DEACTIVATED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  REMOVED
+}
+
+model Tenant {
+  id            String       @id @default(uuid())
+  name          String
+  slug          String       @unique
+  primaryDomain String?      @unique @map("primary_domain")
+  subdomain     String       @unique
+  status        TenantStatus @default(ACTIVE)
+  brandingJson  Json?        @map("branding_json")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  memberships TenantMembership[]
+
+  settings                  Settings?
+  courses                   Course[]
+  instructors               Instructor[]
+  courseInstructors         CourseInstructor[]
+  coursePrices              CoursePrice[]
+  chapters                  Chapter[]
+  lessons                   Lesson[]
+  lessonFiles               LessonFile[]
+  quizzes                   Quiz[]
+  quizAttemptAnswers        QuizAttemptAnswer[]
+  quizQuestions             QuizQuestion[]
+  quizAttempts              QuizAttempt[]
+  enrollments               Enrollment[]
+  enrollmentGrants          EnrollmentGrant[]
+  lessonProgress            LessonProgress[]
+  certificates              Certificate[]
+  payments                  Payment[]
+  courseBundles             CourseBundle[]
+  bundleCourses             BundleCourse[]
+  bundlePrices              BundlePrice[]
+  bundleEnrollments         BundleEnrollment[]
+  carts                     Cart[]
+  cartItems                 CartItem[]
+  orders                    Order[]
+  orderItems                OrderItem[]
+  orderPayments             OrderPayment[]
+  importJobs                ImportJob[]
+  coupons                   Coupon[]
+  couponCourses             CouponCourse[]
+  couponBundles             CouponBundle[]
+  couponRedemptions         CouponRedemption[]
+  refunds                   Refund[]
+  commerceEvents            CommerceEvent[]
+  emailCampaigns            EmailCampaign[]
+  emailCampaignRecipients   EmailCampaignRecipient[]
+  notifications             Notification[]
+  adminAuditLogs            AdminAuditLog[]
+  notificationRecipients    NotificationRecipient[]
+  userActivityEvents        UserActivityEvent[]
+  userXpTransactions        UserXpTransaction[]
+  userGamificationProfiles  UserGamificationProfile[]
+  gamificationLevels        GamificationLevel[]
+  xpRules                   XpRule[]
+  achievementDefinitions    AchievementDefinition[]
+  userAchievements          UserAchievement[]
+  userDailyLearningActivity UserDailyLearningActivity[]
+  userCourseLearningTime    UserCourseLearningTime[]
+  userSegmentSnapshots      UserSegmentSnapshot[]
+  communityCategories       CommunityCategory[]
+  discussionThreads         DiscussionThread[]
+  discussionAnswers         DiscussionAnswer[]
+  discussionReplies         DiscussionReply[]
+  discussionReactions       DiscussionReaction[]
+  discussionFollows         DiscussionFollow[]
+  discussionReports         DiscussionReport[]
+  communityUserRestrictions CommunityUserRestriction[]
+  communityModerationLogs   CommunityModerationLog[]
+  discussionNotifications   DiscussionNotification[]
+  communitySettings         CommunitySettings?
+
+  @@map("tenants")
+}
+
+model TenantMembership {
+  id        String           @id @default(uuid())
+  tenantId  String           @map("tenant_id")
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role             @default(STUDENT)
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@index([tenantId, role])
+  @@map("tenant_memberships")
+}
+
+// Profile table for app users. Row id matches the corresponding Supabase
+// Auth (auth.users) id — auth/session/password handling lives in Supabase,
+// this table only holds the data the app itself needs to query and join on.
+model User {
+  id              String   @id @default(uuid())
+  name            String
+  email           String   @unique
+  phone           String?
+  profilePhotoUrl String?  @map("profile_photo_url")
+  role            Role     @default(STUDENT)
+  isSuperAdmin    Boolean  @default(false) @map("is_super_admin")
+  // IANA timezone, used for all streak/heatmap/"night owl" date-boundary math so
+  // UTC day rollovers don't incorrectly break a learner's streak. Defaults to the
+  // primary market's zone; not yet user-editable (Phase 4 profile settings).
+  timezone        String   @default("Asia/Kolkata")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  courses                  Course[]                    @relation("CourseCreatedBy")
+  bundlesCreated           CourseBundle[]              @relation("BundleCreatedBy")
+  tenantMemberships        TenantMembership[]
+  enrollments              Enrollment[]
+  bundleEnrollments        BundleEnrollment[]
+  bundleEnrollmentsRevoked BundleEnrollment[]          @relation("BundleEnrollmentRevokedBy")
+  enrollmentGrantsRevoked  EnrollmentGrant[]           @relation("EnrollmentGrantRevokedBy")
+  auditLogsPerformed       AdminAuditLog[]             @relation("AuditLogAdmin")
+  auditLogsReceived        AdminAuditLog[]             @relation("AuditLogSubscriber")
+  lessonProgress           LessonProgress[]
+  quizAttempts             QuizAttempt[]
+  certificates             Certificate[]
+  payments                 Payment[]
+  cart                     Cart?
+  orders                   Order[]
+  importJobs               ImportJob[]                 @relation("ImportJobPerformedBy")
+  couponsCreated           Coupon[]                    @relation("CouponCreatedBy")
+  couponRedemptions        CouponRedemption[]
+  refundsIssued            Refund[]                    @relation("RefundIssuedBy")
+  commerceEvents           CommerceEvent[]
+  emailCampaignsCreated    EmailCampaign[]
+  notificationsCreated     Notification[]
+  notificationRecipients   NotificationRecipient[]
+  activityEvents           UserActivityEvent[]
+  xpTransactions           UserXpTransaction[]         @relation("XpTransactionUser")
+  xpTransactionsAwarded    UserXpTransaction[]         @relation("XpTransactionAdmin")
+  gamificationProfile      UserGamificationProfile?
+  achievements             UserAchievement[]
+  dailyLearningActivity    UserDailyLearningActivity[]
+  courseLearningTime       UserCourseLearningTime[]
+  segmentSnapshots         UserSegmentSnapshot[]
+
+  communityCategoriesCreated      CommunityCategory[]        @relation("CommunityCategoryCreatedBy")
+  discussionThreads               DiscussionThread[]         @relation("DiscussionThreadAuthor")
+  discussionThreadsHidden         DiscussionThread[]         @relation("DiscussionThreadHiddenBy")
+  discussionThreadsDeleted        DiscussionThread[]         @relation("DiscussionThreadDeletedBy")
+  discussionAnswers               DiscussionAnswer[]         @relation("DiscussionAnswerAuthor")
+  discussionAnswersHidden         DiscussionAnswer[]         @relation("DiscussionAnswerHiddenBy")
+  discussionAnswersDeleted        DiscussionAnswer[]         @relation("DiscussionAnswerDeletedBy")
+  discussionReplies               DiscussionReply[]          @relation("DiscussionReplyAuthor")
+  discussionRepliesHidden         DiscussionReply[]          @relation("DiscussionReplyHiddenBy")
+  discussionRepliesDeleted        DiscussionReply[]          @relation("DiscussionReplyDeletedBy")
+  discussionReactions             DiscussionReaction[]
+  discussionFollows               DiscussionFollow[]
+  discussionReportsFiled          DiscussionReport[]         @relation("DiscussionReportReporter")
+  discussionReportsReviewed       DiscussionReport[]         @relation("DiscussionReportReviewedBy")
+  communityRestrictions           CommunityUserRestriction[] @relation("CommunityUserRestrictionUser")
+  communityRestrictionsCreated    CommunityUserRestriction[] @relation("CommunityUserRestrictionCreatedBy")
+  communityRestrictionsLifted     CommunityUserRestriction[] @relation("CommunityUserRestrictionLiftedBy")
+  communityModerationLogsActed    CommunityModerationLog[]   @relation("CommunityModerationLogActor")
+  communityModerationLogsTargeted CommunityModerationLog[]   @relation("CommunityModerationLogTargetUser")
+  discussionNotifications         DiscussionNotification[]   @relation("DiscussionNotificationUser")
+  discussionNotificationsActed    DiscussionNotification[]   @relation("DiscussionNotificationActor")
+
+  @@index([role])
+  @@map("users")
+}
+
+// Single-row table for this deployment's branding + certificate template +
+// encrypted integration keys. Always upserted against a fixed known id
+// ("main") rather than enforced at the DB level, since one deployment = one row.
+model Settings {
+  tenantId                      String  @id @map("tenant_id")
+  tenant                        Tenant  @relation(fields: [tenantId], references: [id])
+  logoUrl                       String? @map("logo_url")
+  faviconUrl                    String? @map("favicon_url")
+  certificateTemplateUrl        String? @map("certificate_template_url")
+  certificateFieldPositionsJson Json?   @map("certificate_field_positions_json")
+
+  platformName     String? @map("platform_name")
+  shortName        String? @map("short_name")
+  adminPanelName   String? @map("admin_panel_name")
+  primaryColor     String? @map("primary_color")
+  darkPrimaryColor String? @map("dark_primary_color")
+  supportEmail     String? @map("support_email")
+  footerText       String? @map("footer_text")
+
+  razorpayKeyIdEncrypted         String? @map("razorpay_key_id_encrypted")
+  razorpayKeySecretEncrypted     String? @map("razorpay_key_secret_encrypted")
+  razorpayWebhookSecretEncrypted String? @map("razorpay_webhook_secret_encrypted")
+
+  stripePublishableKeyEncrypted String? @map("stripe_publishable_key_encrypted")
+  stripeSecretKeyEncrypted      String? @map("stripe_secret_key_encrypted")
+  stripeWebhookSecretEncrypted  String? @map("stripe_webhook_secret_encrypted")
+
+  resendApiKeyEncrypted String? @map("resend_api_key_encrypted")
+  resendSenderEmail     String? @map("resend_sender_email")
+  resendSenderName      String? @map("resend_sender_name")
+
+  // Admin Analytics — engagement-segment thresholds (see lib/analytics/settings.ts).
+  // "Active" = qualifying activity within the last N days; the same window doubles
+  // as the "Slowing Down" comparison window length (this vs. the prior equal window).
+  analyticsActiveWindowDays Int @default(7) @map("analytics_active_window_days")
+  analyticsSlowingDownDays  Int @default(7) @map("analytics_slowing_down_days")
+  analyticsAtRiskDays       Int @default(14) @map("analytics_at_risk_days")
+  analyticsDormantDays      Int @default(30) @map("analytics_dormant_days")
+
+  // Admin Analytics — Phase 3 Commercial Intelligence. Number of days before a
+  // course/bundle discount's discountEndAt to surface the "discount nearing
+  // expiry" insight (see lib/analytics/commerce-insights.ts).
+  commerceDiscountExpiryAlertDays Int @default(7) @map("commerce_discount_expiry_alert_days")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model Course {
+  id                     String               @id @default(uuid())
+  tenantId               String               @map("tenant_id")
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id])
+  title                  String
+  description            String?
+  shortDescription       String?              @map("short_description")
+  isFree                 Boolean              @default(false) @map("is_free")
+  thumbnailUrl           String?              @map("thumbnail_url")
+  previewVideoUrl        String?              @map("preview_video_url")
+  previewVideoSourceType VideoSource?         @map("preview_video_source_type")
+  status                 CourseStatus         @default(DRAFT)
+  learningStatus         CourseLearningStatus @default(ACTIVE) @map("learning_status")
+  level                  CourseLevel?
+  tags                   String[]             @default([])
+  prerequisites          String[]             @default([])
+  learningObjectives     String[]             @default([]) @map("learning_objectives")
+  outcomes               String[]             @default([])
+  targetAudience         String[]             @default([]) @map("target_audience")
+  materialsIncluded      String[]             @default([]) @map("materials_included")
+  durationMinutes        Int?                 @map("duration_minutes")
+  certificateEnabled     Boolean              @default(true) @map("certificate_enabled")
+
+  // Same access-duration convention as CourseBundle (see comment there):
+  // accessDurationMonths null + isPermanentAccess true = forever.
+  accessDurationMonths Int?    @map("access_duration_months")
+  isPermanentAccess    Boolean @default(true) @map("is_permanent_access")
+
+  launchDate  DateTime? @map("launch_date")
+  createdById String    @map("created_by")
+  createdBy   User      @relation("CourseCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  prices            CoursePrice[]
+  chapters          Chapter[]
+  quizzes           Quiz[]
+  enrollments       Enrollment[]
+  payments          Payment[]
+  certificates      Certificate[]
+  bundles           BundleCourse[]
+  cartItems         CartItem[]
+  orderItems        OrderItem[]
+  couponCourses     CouponCourse[]
+  discussionThreads DiscussionThread[]
+  instructors       CourseInstructor[]
+
+  @@index([tenantId])
+  @@map("courses")
+}
+
+model Instructor {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  title     String?
+  bio       String?
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  courses CourseInstructor[]
+
+  @@index([tenantId])
+  @@map("instructors")
+}
+
+model CourseInstructor {
+  id           String     @id @default(uuid())
+  tenantId     String     @map("tenant_id")
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  courseId     String     @map("course_id")
+  course       Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructorId String     @map("instructor_id")
+  instructor   Instructor @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  order        Int        @default(0)
+
+  @@unique([courseId, instructorId])
+  @@index([tenantId])
+  @@map("course_instructors")
+}
+
+model CoursePrice {
+  id       String   @id @default(uuid())
+  tenantId String   @map("tenant_id")
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  courseId String   @map("course_id")
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  currency Currency
+  amount   Decimal  @db.Decimal(10, 2)
+
+  discountedPrice           Decimal?  @map("discounted_price") @db.Decimal(10, 2)
+  discountStartAt           DateTime? @map("discount_start_at")
+  discountEndAt             DateTime? @map("discount_end_at")
+  maxDiscountedEnrollments  Int?      @map("max_discounted_enrollments")
+  discountedEnrollmentsUsed Int       @default(0) @map("discounted_enrollments_used")
+
+  @@unique([courseId, currency])
+  @@index([tenantId])
+  @@map("course_prices")
+}
+
+model Chapter {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  courseId String @map("course_id")
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title    String
+  order    Int
+
+  lessons Lesson[]
+  quizzes Quiz[]
+
+  @@index([tenantId])
+  @@map("chapters")
+}
+
+model Lesson {
+  id              String       @id @default(uuid())
+  tenantId        String       @map("tenant_id")
+  tenant          Tenant       @relation(fields: [tenantId], references: [id])
+  chapterId       String       @map("chapter_id")
+  chapter         Chapter      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  title           String
+  lessonType      LessonType   @default(VIDEO) @map("lesson_type")
+  videoUrl        String?      @map("video_url")
+  videoSourceType VideoSource? @map("video_source_type")
+  captionUrl      String?      @map("caption_url")
+  textContent     String?      @map("text_content")
+  instructions    String?
+  order           Int
+
+  files    LessonFile[]
+  progress LessonProgress[]
+
+  @@index([tenantId])
+  @@map("lessons")
+}
+
+model LessonFile {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  lessonId String @map("lesson_id")
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  fileUrl  String @map("file_url")
+  fileName String @map("file_name")
+
+  @@index([tenantId])
+  @@map("lesson_files")
+}
+
+// Attached to either a chapter or a whole course — exactly one of
+// chapterId / courseId is set, enforced at the application layer.
+model Quiz {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  chapterId        String?  @map("chapter_id")
+  chapter          Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  courseId         String?  @map("course_id")
+  course           Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title            String
+  passPercentage   Int      @map("pass_percentage")
+  // Null means untimed.
+  timeLimitMinutes Int?     @map("time_limit_minutes")
+
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+
+  @@index([tenantId])
+  @@map("quizzes")
+}
+
+model QuizAttemptAnswer {
+  id         String       @id @default(uuid())
+  tenantId   String       @map("tenant_id")
+  tenant     Tenant       @relation(fields: [tenantId], references: [id])
+  attemptId  String       @map("attempt_id")
+  attempt    QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId String       @map("question_id")
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  // Mirrors QuizQuestion's own two-field answer storage — a set of selected options for
+  // SINGLE_CHOICE/MULTIPLE_CHOICE/TRUE_FALSE, or free text for FILL_BLANK. Never both.
+  givenOptionsJson Json?   @map("given_options_json")
+  givenAnswerText  String? @map("given_answer_text")
+  isCorrect        Boolean @map("is_correct")
+
+  @@unique([attemptId, questionId])
+  @@index([tenantId])
+  @@map("quiz_attempt_answers")
+}
+
+model QuizQuestion {
+  id           String       @id @default(uuid())
+  tenantId     String       @map("tenant_id")
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  quizId       String       @map("quiz_id")
+  quiz         Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  questionText String       @map("question_text")
+  questionType QuestionType @default(SINGLE_CHOICE) @map("question_type")
+
+  // Option labels shown to the student — used by SINGLE_CHOICE and MULTIPLE_CHOICE only.
+  optionsJson        Json?   @map("options_json")
+  // Array of correct option strings — used by SINGLE_CHOICE (length 1), MULTIPLE_CHOICE
+  // (length 1+), and TRUE_FALSE (length 1, "true" or "false").
+  correctOptionsJson Json?   @map("correct_options_json")
+  // Accepted text answer — used by FILL_BLANK only. Kept as a separate typed field
+  // rather than folded into correctOptionsJson since its comparison (case/whitespace-
+  // insensitive string match) is a different shape of check than option-set matching.
+  correctAnswerText  String? @map("correct_answer_text")
+
+  // Shown only on the final results screen next to this question, alongside
+  // whether the student got it right — never during the quiz itself.
+  explanation String? @map("explanation")
+
+  order Int
+
+  attemptAnswers QuizAttemptAnswer[]
+
+  @@index([tenantId])
+  @@map("quiz_questions")
+}
+
+model QuizAttempt {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId      String   @map("quiz_id")
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  score       Int
+  passed      Boolean
+  attemptedAt DateTime @default(now()) @map("attempted_at")
+
+  answers QuizAttemptAnswer[]
+
+  @@index([tenantId, userId])
+  @@index([tenantId, quizId])
+  @@index([tenantId, attemptedAt])
+  @@index([tenantId, quizId, attemptedAt])
+  @@index([tenantId, userId, quizId])
+  @@map("quiz_attempts")
+}
+
+model Enrollment {
+  id         String           @id @default(uuid())
+  tenantId   String           @map("tenant_id")
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  userId     String           @map("user_id")
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId   String           @map("course_id")
+  course     Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  paymentId  String?          @map("payment_id")
+  enrolledAt DateTime         @default(now()) @map("enrolled_at")
+  status     EnrollmentStatus @default(ACTIVE)
+
+  accessStartAt        DateTime  @default(now()) @map("access_start_at")
+  accessEndAt          DateTime? @map("access_end_at")
+  accessDurationMonths Int?      @map("access_duration_months")
+  isPermanent          Boolean   @default(true) @map("is_permanent")
+
+  // Tracks whether this course access came from a direct enrollment/purchase or
+  // through a bundle, so the UI can show e.g. "Access source: Bundle — <name>".
+  // sourceBundleId is nullable + SetNull on delete so deleting a bundle never
+  // deletes or corrupts the learner's actual course access.
+  source         EnrollmentSource @default(DIRECT)
+  sourceBundleId String?          @map("source_bundle_id")
+  sourceBundle   CourseBundle?    @relation(fields: [sourceBundleId], references: [id], onDelete: SetNull)
+  // Audit link to the Order that granted this access, when applicable — nullable +
+  // SetNull on delete so deleting an order record never revokes a learner's access.
+  sourceOrderId  String?          @map("source_order_id")
+  sourceOrder    Order?           @relation(fields: [sourceOrderId], references: [id], onDelete: SetNull)
+
+  grants EnrollmentGrant[]
+
+  @@unique([userId, courseId])
+  @@index([tenantId, courseId])
+  @@index([tenantId, enrolledAt])
+  @@index([tenantId, status])
+  @@index([tenantId, courseId, status])
+  @@map("enrollments")
+}
+
+// One row per individual grant event for a course (direct purchase, bundle
+// purchase, admin assignment, CSV import, free checkout). The parent
+// Enrollment row stays the fast "does this user currently have access"
+// record used everywhere in the app (course gating, the student dashboard);
+// this table is what lets the admin console revoke one source of access
+// (e.g. a bundle grant) without touching another still-active source (e.g.
+// a direct purchase) for the same course. See recomputeEnrollmentFromGrants
+// in lib/entitlements.ts, which keeps Enrollment in sync with these rows.
+model EnrollmentGrant {
+  id             String           @id @default(uuid())
+  tenantId       String           @map("tenant_id")
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  enrollmentId   String           @map("enrollment_id")
+  enrollment     Enrollment       @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  status         EnrollmentStatus @default(ACTIVE)
+  source         EnrollmentSource
+  sourceBundleId String?          @map("source_bundle_id")
+  sourceBundle   CourseBundle?    @relation(fields: [sourceBundleId], references: [id], onDelete: SetNull)
+  sourceOrderId  String?          @map("source_order_id")
+  sourceOrder    Order?           @relation(fields: [sourceOrderId], references: [id], onDelete: SetNull)
+
+  grantedAt            DateTime  @default(now()) @map("granted_at")
+  accessStartAt        DateTime  @map("access_start_at")
+  accessEndAt          DateTime? @map("access_end_at")
+  accessDurationMonths Int?      @map("access_duration_months")
+  isPermanent          Boolean   @default(true) @map("is_permanent")
+
+  revokedAt        DateTime? @map("revoked_at")
+  revokedById      String?   @map("revoked_by")
+  revokedBy        User?     @relation("EnrollmentGrantRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+  revocationReason String?   @map("revocation_reason")
+
+  @@index([tenantId])
+  @@map("enrollment_grants")
+}
+
+model LessonProgress {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String    @map("lesson_id")
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt DateTime? @map("completed_at")
+
+  @@unique([userId, lessonId])
+  @@index([tenantId, completedAt])
+  @@index([tenantId, lessonId, completedAt])
+  @@map("lesson_progress")
+}
+
+model Certificate {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String   @map("course_id")
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  certificateCode String   @unique @map("certificate_code")
+  issuedAt        DateTime @default(now()) @map("issued_at")
+  fileUrl         String   @map("file_url")
+
+  @@index([tenantId])
+  @@map("certificates")
+}
+
+model Payment {
+  id               String         @id @default(uuid())
+  tenantId         String         @map("tenant_id")
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  userId           String         @map("user_id")
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId         String         @map("course_id")
+  course           Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  gateway          PaymentGateway
+  gatewayOrderId   String?        @map("gateway_order_id")
+  gatewayPaymentId String?        @unique @map("gateway_payment_id")
+  currency         Currency
+  amount           Decimal        @db.Decimal(10, 2)
+  status           PaymentStatus  @default(PENDING)
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@map("payments")
+}
+
+model CourseBundle {
+  id               String       @id @default(uuid())
+  tenantId         String       @map("tenant_id")
+  tenant           Tenant       @relation(fields: [tenantId], references: [id])
+  name             String
+  slug             String       @unique
+  shortDescription String?      @map("short_description")
+  description      String?
+  thumbnailUrl     String?      @map("thumbnail_url")
+  tags             String[]     @default([])
+  launchDate       DateTime?    @map("launch_date")
+  status           BundleStatus @default(DRAFT)
+  isFree           Boolean      @default(false) @map("is_free")
+
+  // Access policy applied whenever this bundle is granted (purchase or admin
+  // assignment). accessDurationMonths null + isPermanentAccess true = forever.
+  // A non-null accessDurationMonths covers both the 3/6/9/12 presets and an
+  // admin-entered "custom" month count — both just feed computeAccess().
+  accessDurationMonths Int?    @map("access_duration_months")
+  isPermanentAccess    Boolean @default(true) @map("is_permanent_access")
+
+  createdById String   @map("created_by")
+  createdBy   User     @relation("BundleCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  courses            BundleCourse[]
+  prices             BundlePrice[]
+  enrollments        BundleEnrollment[]
+  grantedEnrollments Enrollment[]
+  enrollmentGrants   EnrollmentGrant[]
+  cartItems          CartItem[]
+  orderItems         OrderItem[]
+  couponBundles      CouponBundle[]
+
+  @@index([tenantId])
+  @@map("course_bundles")
+}
+
+model BundleCourse {
+  id       String       @id @default(uuid())
+  tenantId String       @map("tenant_id")
+  tenant   Tenant       @relation(fields: [tenantId], references: [id])
+  bundleId String       @map("bundle_id")
+  bundle   CourseBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  courseId String       @map("course_id")
+  course   Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  order    Int          @default(0)
+  addedAt  DateTime     @default(now()) @map("added_at")
+
+  @@unique([bundleId, courseId])
+  @@index([tenantId])
+  @@map("bundle_courses")
+}
+
+model BundlePrice {
+  id       String       @id @default(uuid())
+  tenantId String       @map("tenant_id")
+  tenant   Tenant       @relation(fields: [tenantId], references: [id])
+  bundleId String       @map("bundle_id")
+  bundle   CourseBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  currency Currency
+  amount   Decimal      @db.Decimal(10, 2)
+
+  discountedPrice           Decimal?  @map("discounted_price") @db.Decimal(10, 2)
+  discountStartAt           DateTime? @map("discount_start_at")
+  discountEndAt             DateTime? @map("discount_end_at")
+  maxDiscountedEnrollments  Int?      @map("max_discounted_enrollments")
+  discountedEnrollmentsUsed Int       @default(0) @map("discounted_enrollments_used")
+
+  @@unique([bundleId, currency])
+  @@index([tenantId])
+  @@map("bundle_prices")
+}
+
+// Top-level "this user owns this bundle" record — the audit trail / entitlement
+// record, distinct from the per-course Enrollment rows it grants access to.
+model BundleEnrollment {
+  id            String           @id @default(uuid())
+  tenantId      String           @map("tenant_id")
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  userId        String           @map("user_id")
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bundleId      String           @map("bundle_id")
+  bundle        CourseBundle     @relation(fields: [bundleId], references: [id], onDelete: Restrict)
+  status        EnrollmentStatus @default(ACTIVE)
+  enrolledAt    DateTime         @default(now()) @map("enrolled_at")
+  sourceOrderId String?          @map("source_order_id")
+  sourceOrder   Order?           @relation(fields: [sourceOrderId], references: [id], onDelete: SetNull)
+
+  revokedAt        DateTime? @map("revoked_at")
+  revokedById      String?   @map("revoked_by")
+  revokedBy        User?     @relation("BundleEnrollmentRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+  revocationReason String?   @map("revocation_reason")
+
+  @@unique([userId, bundleId])
+  @@index([tenantId])
+  @@map("bundle_enrollments")
+}
+
+// One open cart per user. Cart contents are cleared only on successful order
+// fulfillment (see order-fulfillment.ts), not at order-creation time, so a
+// failed/abandoned payment leaves the cart intact for retry.
+model Cart {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  userId    String   @unique @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items CartItem[]
+
+  @@index([tenantId])
+  @@map("carts")
+}
+
+// Exactly one of courseId / bundleId is set, enforced at the application layer
+// (same convention as Quiz.chapterId/courseId). Duplicate-add prevention is also
+// application-level (see lib/cart.ts) rather than a DB unique constraint, since
+// Postgres unique indexes can't cleanly express "unique per type with a nullable
+// column" without a partial index.
+model CartItem {
+  id       String        @id @default(uuid())
+  tenantId String        @map("tenant_id")
+  tenant   Tenant        @relation(fields: [tenantId], references: [id])
+  cartId   String        @map("cart_id")
+  cart     Cart          @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  itemType CartItemType  @map("item_type")
+  courseId String?       @map("course_id")
+  course   Course?       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  bundleId String?       @map("bundle_id")
+  bundle   CourseBundle? @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  addedAt  DateTime      @default(now()) @map("added_at")
+
+  @@index([tenantId])
+  @@map("cart_items")
+}
+
+model Order {
+  id            String             @id @default(uuid())
+  tenantId      String             @map("tenant_id")
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  orderNumber   String             @unique @map("order_number")
+  userId        String             @map("user_id")
+  user          User               @relation(fields: [userId], references: [id])
+  status        OrderStatus        @default(PENDING)
+  currency      Currency
+  subtotal      Decimal            @db.Decimal(10, 2)
+  discountTotal Decimal            @default(0) @map("discount_total") @db.Decimal(10, 2)
+  totalAmount   Decimal            @map("total_amount") @db.Decimal(10, 2)
+  paymentMethod OrderPaymentMethod @map("payment_method")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  paidAt        DateTime?          @map("paid_at")
+
+  // Coupon applied at checkout — distinct from discountTotal (per-item sale
+  // pricing). couponCode is a snapshot so it survives the coupon being renamed
+  // or deleted later; couponId is nullable + SetNull so deleting a Coupon never
+  // corrupts a historical order.
+  couponId             String? @map("coupon_id")
+  coupon               Coupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode           String? @map("coupon_code")
+  couponDiscountAmount Decimal @default(0) @map("coupon_discount_amount") @db.Decimal(10, 2)
+
+  items             OrderItem[]
+  payment           OrderPayment?
+  enrollments       Enrollment[]
+  enrollmentGrants  EnrollmentGrant[]
+  bundleEnrollments BundleEnrollment[]
+  couponRedemption  CouponRedemption?
+  refunds           Refund[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, paidAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status, paidAt])
+  @@map("orders")
+}
+
+// Price and title are snapshotted at purchase time so later edits to a course's
+// price or name never retroactively change a historical order's record.
+model OrderItem {
+  id            String        @id @default(uuid())
+  tenantId      String        @map("tenant_id")
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  orderId       String        @map("order_id")
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemType      CartItemType  @map("item_type")
+  courseId      String?       @map("course_id")
+  course        Course?       @relation(fields: [courseId], references: [id])
+  bundleId      String?       @map("bundle_id")
+  bundle        CourseBundle? @relation(fields: [bundleId], references: [id])
+  titleSnapshot String        @map("title_snapshot")
+  originalPrice Decimal       @map("original_price") @db.Decimal(10, 2)
+  finalPrice    Decimal       @map("final_price") @db.Decimal(10, 2)
+
+  // Support Phase 3 Commercial Intelligence's per-course/per-bundle revenue
+  // rollups (commerce-products.ts, commerce-engagement-matrix.ts), which sum
+  // finalPrice across every OrderItem for a given course/bundle — the same
+  // justification as Enrollment's existing @@index([courseId]).
+  @@index([tenantId, courseId])
+  @@index([tenantId, bundleId])
+  @@map("order_items")
+}
+
+// One payment record per order. gateway is null and gatewayPaymentId is null for
+// FREE orders. gatewayPaymentId is the idempotency key for webhook/client-verify
+// race safety, mirroring Payment.gatewayPaymentId's existing role.
+model OrderPayment {
+  id               String          @id @default(uuid())
+  tenantId         String          @map("tenant_id")
+  tenant           Tenant          @relation(fields: [tenantId], references: [id])
+  orderId          String          @unique @map("order_id")
+  order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  gateway          PaymentGateway?
+  gatewayOrderId   String?         @map("gateway_order_id")
+  gatewayPaymentId String?         @unique @map("gateway_payment_id")
+  gatewaySignature String?         @map("gateway_signature")
+  status           PaymentStatus   @default(PENDING)
+  createdAt        DateTime        @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@map("order_payments")
+}
+
+// Audit record for both CSV importers (bulk user creation and quiz question
+// import) — who ran it, when, and the per-row outcome.
+model ImportJob {
+  id            String          @id @default(uuid())
+  tenantId      String          @map("tenant_id")
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  type          ImportJobType
+  performedById String          @map("performed_by")
+  performedBy   User            @relation("ImportJobPerformedBy", fields: [performedById], references: [id])
+  courseId      String?         @map("course_id")
+  quizId        String?         @map("quiz_id")
+  status        ImportJobStatus @default(PENDING)
+  totalRows     Int             @default(0) @map("total_rows")
+  successCount  Int             @default(0) @map("success_count")
+  failureCount  Int             @default(0) @map("failure_count")
+  errorsJson    Json?           @map("errors_json")
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@map("import_jobs")
+}
+
+// Admin-created discount code entered by the student at checkout — a distinct
+// mechanism from CoursePrice/BundlePrice's automatic "sale price" discounts;
+// the two can stack (a course on sale can still have a coupon applied on top).
+model Coupon {
+  id                String     @id @default(uuid())
+  tenantId          String     @map("tenant_id")
+  tenant            Tenant     @relation(fields: [tenantId], references: [id])
+  code              String     @unique
+  description       String?
+  type              CouponType
+  // Interpreted as a percent number (e.g. 20 = 20%) for PERCENTAGE, or a plain
+  // rupee amount for FIXED_AMOUNT.
+  value             Decimal    @db.Decimal(10, 2)
+  // Only meaningful for PERCENTAGE — caps the absolute discount (e.g. "20% off,
+  // up to ₹500").
+  maxDiscountAmount Decimal?   @map("max_discount_amount") @db.Decimal(10, 2)
+  // Checked against the eligible subtotal (see scope below), not the whole cart.
+  minOrderAmount    Decimal?   @map("min_order_amount") @db.Decimal(10, 2)
+
+  validFrom  DateTime? @map("valid_from")
+  validUntil DateTime? @map("valid_until")
+
+  maxRedemptions        Int? @map("max_redemptions")
+  redemptionsUsed       Int  @default(0) @map("redemptions_used")
+  maxRedemptionsPerUser Int? @map("max_redemptions_per_user")
+
+  isActive Boolean     @default(true) @map("is_active")
+  scope    CouponScope @default(ALL)
+
+  createdById String   @map("created_by")
+  createdBy   User     @relation("CouponCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  courses     CouponCourse[]
+  bundles     CouponBundle[]
+  orders      Order[]
+  redemptions CouponRedemption[]
+
+  @@index([tenantId])
+  @@map("coupons")
+}
+
+// Only populated when Coupon.scope = SPECIFIC — the set of courses this coupon
+// is allowed to discount. Mirrors the existing BundleCourse join-table pattern.
+model CouponCourse {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  couponId String @map("coupon_id")
+  coupon   Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  courseId String @map("course_id")
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, courseId])
+  @@index([tenantId])
+  @@map("coupon_courses")
+}
+
+model CouponBundle {
+  id       String       @id @default(uuid())
+  tenantId String       @map("tenant_id")
+  tenant   Tenant       @relation(fields: [tenantId], references: [id])
+  couponId String       @map("coupon_id")
+  coupon   Coupon       @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  bundleId String       @map("bundle_id")
+  bundle   CourseBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, bundleId])
+  @@index([tenantId])
+  @@map("coupon_bundles")
+}
+
+// Audit trail + the mechanism for enforcing maxRedemptionsPerUser (count rows
+// for a given couponId+userId). One row per order — written only on successful
+// fulfillment (see order-fulfillment.ts::bumpCouponUsage), never at order
+// creation, so an abandoned/pending order never consumes a limited-use coupon.
+model CouponRedemption {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  couponId       String   @map("coupon_id")
+  coupon         Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  userId         String   @map("user_id")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId        String   @unique @map("order_id")
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  discountAmount Decimal  @map("discount_amount") @db.Decimal(10, 2)
+  redeemedAt     DateTime @default(now()) @map("redeemed_at")
+
+  @@index([tenantId])
+  @@map("coupon_redemptions")
+}
+
+// ── Phase 3: Commercial Intelligence ────────────────────────────────────
+
+// Records a refund event against an order. Supports partial refunds — an
+// order can have multiple Refund rows (e.g. one per item, or a partial + a
+// top-up) whose amounts sum to at most order.totalAmount. Order.status
+// (REFUNDED/PARTIALLY_REFUNDED) remains the authoritative "current state"
+// flag, set by the admin refund action; this table is the append-only
+// ledger of how it got there. amount/currency are snapshotted (not derived
+// from Order at read time) so a later currency change never rewrites
+// history. "Days from purchase to refund" is computed at query time as
+// refundedAt - order.paidAt (Order.paidAt is immutable once PAID, so no
+// snapshot column is needed here).
+model Refund {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  orderId         String   @map("order_id")
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount          Decimal  @db.Decimal(10, 2)
+  currency        Currency
+  reason          String?
+  // Razorpay refund id, when the refund was pushed to the gateway; null for
+  // refunds recorded as an offline/manual accounting entry.
+  gatewayRefundId String?  @map("gateway_refund_id")
+  issuedByAdminId String   @map("issued_by_admin_id")
+  issuedByAdmin   User     @relation("RefundIssuedBy", fields: [issuedByAdminId], references: [id])
+  refundedAt      DateTime @default(now()) @map("refunded_at")
+
+  @@index([tenantId, orderId])
+  @@index([tenantId, refundedAt])
+  @@map("refunds")
+}
+
+enum CommerceEventType {
+  PRODUCT_VIEWED
+  ADDED_TO_CART
+  CHECKOUT_STARTED
+  PAYMENT_INITIATED
+}
+
+// Lightweight commerce funnel ledger — mirrors UserActivityEvent's "central
+// ledger" convention but scoped to pre-purchase commerce actions, kept
+// separate so commerce instrumentation never has to reason about XP/streak
+// side effects and vice versa. userId is nullable because PRODUCT_VIEWED is
+// conceptually possible for anonymous visitors, though this deployment only
+// writes rows for authenticated users (no anonymous/session id exists
+// elsewhere in the app to key an anonymous row on — see
+// lib/analytics/definitions.ts's Phase 3 limitations note). courseId/
+// bundleId/orderId are plain non-FK strings, matching UserActivityEvent's
+// convention, so a later course/bundle/order deletion never blocks or
+// cascades a historical funnel record. Payment-completed is not tracked
+// here — it's read directly from Order.status/paidAt.
+model CommerceEvent {
+  id           String            @id @default(uuid())
+  tenantId     String            @map("tenant_id")
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  userId       String?           @map("user_id")
+  user         User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type         CommerceEventType
+  courseId     String?           @map("course_id")
+  bundleId     String?           @map("bundle_id")
+  orderId      String?           @map("order_id")
+  metadataJson Json?             @map("metadata_json")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  @@index([tenantId, type, createdAt])
+  @@index([tenantId, userId, type])
+  @@index([tenantId, courseId, type])
+  @@index([tenantId, bundleId, type])
+  @@map("commerce_events")
+}
+
+// Communications Center — admin-authored email campaigns and in-app
+// notifications. Audience targeting is resolved server-side at send/publish
+// time from selectedCourseIds/selectedBundleIds/manuallySelectedUserIds minus
+// excludedUserIds; ALL_USERS/ALL_ENROLLED short-circuit that union. Course/
+// bundle/user id arrays are stored as plain String[] (no FK) so deleting a
+// course or user later never blocks reading historical campaign records.
+model EmailCampaign {
+  id                      String                    @id @default(uuid())
+  tenantId                String                    @map("tenant_id")
+  tenant                  Tenant                    @relation(fields: [tenantId], references: [id])
+  internalName            String                    @map("internal_name")
+  subject                 String
+  preheader               String?
+  htmlContent             String                    @map("html_content")
+  editorContentJson       Json?                     @map("editor_content_json")
+  senderName              String?                   @map("sender_name")
+  fromEmail               String?                   @map("from_email")
+  replyTo                 String?                   @map("reply_to")
+  audienceType            CommunicationAudienceType @default(MANUAL) @map("audience_type")
+  selectedCourseIds       String[]                  @default([]) @map("selected_course_ids")
+  selectedBundleIds       String[]                  @default([]) @map("selected_bundle_ids")
+  manuallySelectedUserIds String[]                  @default([]) @map("manually_selected_user_ids")
+  excludedUserIds         String[]                  @default([]) @map("excluded_user_ids")
+  recipientCount          Int                       @default(0) @map("recipient_count")
+  status                  EmailCampaignStatus       @default(DRAFT)
+  scheduledAt             DateTime?                 @map("scheduled_at")
+  sentAt                  DateTime?                 @map("sent_at")
+  createdById             String                    @map("created_by")
+  createdBy               User                      @relation(fields: [createdById], references: [id])
+  createdAt               DateTime                  @default(now()) @map("created_at")
+  updatedAt               DateTime                  @updatedAt @map("updated_at")
+
+  recipients EmailCampaignRecipient[]
+
+  @@index([tenantId])
+  @@map("email_campaigns")
+}
+
+model EmailCampaignRecipient {
+  id              String               @id @default(uuid())
+  tenantId        String               @map("tenant_id")
+  tenant          Tenant               @relation(fields: [tenantId], references: [id])
+  campaignId      String               @map("campaign_id")
+  campaign        EmailCampaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId          String?              @map("user_id")
+  email           String
+  sendStatus      EmailRecipientStatus @default(PENDING) @map("send_status")
+  resendMessageId String?              @map("resend_message_id")
+  errorMessage    String?              @map("error_message")
+  sentAt          DateTime?            @map("sent_at")
+
+  @@unique([campaignId, email])
+  @@index([tenantId])
+  @@map("email_campaign_recipients")
+}
+
+model Notification {
+  id                      String                    @id @default(uuid())
+  tenantId                String                    @map("tenant_id")
+  tenant                  Tenant                    @relation(fields: [tenantId], references: [id])
+  internalName            String                    @map("internal_name")
+  title                   String
+  richContent             String                    @map("rich_content")
+  editorContentJson       Json?                     @map("editor_content_json")
+  imageUrl                String?                   @map("image_url")
+  ctaLabel                String?                   @map("cta_label")
+  ctaUrl                  String?                   @map("cta_url")
+  priority                NotificationPriority      @default(NORMAL)
+  audienceType            CommunicationAudienceType @default(MANUAL) @map("audience_type")
+  selectedCourseIds       String[]                  @default([]) @map("selected_course_ids")
+  selectedBundleIds       String[]                  @default([]) @map("selected_bundle_ids")
+  manuallySelectedUserIds String[]                  @default([]) @map("manually_selected_user_ids")
+  excludedUserIds         String[]                  @default([]) @map("excluded_user_ids")
+  status                  NotificationStatus        @default(DRAFT)
+  scheduledAt             DateTime?                 @map("scheduled_at")
+  publishedAt             DateTime?                 @map("published_at")
+  expiresAt               DateTime?                 @map("expires_at")
+  createdById             String                    @map("created_by")
+  createdBy               User                      @relation(fields: [createdById], references: [id])
+  createdAt               DateTime                  @default(now()) @map("created_at")
+  updatedAt               DateTime                  @updatedAt @map("updated_at")
+
+  recipients NotificationRecipient[]
+
+  @@index([tenantId])
+  @@map("notifications")
+}
+
+// Append-only audit trail for admin access-removal actions in the Subscriber
+// Management console (revoking a single course grant or an entire bundle).
+// No update/delete surface is exposed anywhere in the admin UI.
+model AdminAuditLog {
+  id                  String   @id @default(uuid())
+  tenantId            String   @map("tenant_id")
+  tenant              Tenant   @relation(fields: [tenantId], references: [id])
+  adminId             String   @map("admin_id")
+  admin               User     @relation("AuditLogAdmin", fields: [adminId], references: [id])
+  subscriberId        String   @map("subscriber_id")
+  subscriber          User     @relation("AuditLogSubscriber", fields: [subscriberId], references: [id], onDelete: Cascade)
+  // "REVOKE_COURSE_GRANT" | "REVOKE_BUNDLE"
+  action              String
+  // "COURSE" | "BUNDLE"
+  targetType          String   @map("target_type")
+  targetId            String   @map("target_id")
+  targetTitleSnapshot String   @map("target_title_snapshot")
+  previousStatus      String   @map("previous_status")
+  newStatus           String   @map("new_status")
+  reason              String?
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@map("admin_audit_logs")
+}
+
+model NotificationRecipient {
+  id             String       @id @default(uuid())
+  tenantId       String       @map("tenant_id")
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  notificationId String       @map("notification_id")
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String       @map("user_id")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveredAt    DateTime     @default(now()) @map("delivered_at")
+  readAt         DateTime?    @map("read_at")
+
+  @@unique([notificationId, userId])
+  @@index([tenantId])
+  @@map("notification_recipients")
+}
+
+// ── Analytics & Gamification (Phase 1+2) ────────────────────────────────
+// Course/chapter/lesson/quiz references below are deliberately plain,
+// non-FK string columns (same convention as EmailCampaign's selected*Ids) —
+// an activity/XP/analytics record must never be blocked or cascaded by a
+// later course/lesson edit or deletion.
+
+enum ActivityEventType {
+  USER_REGISTERED
+  PROFILE_COMPLETED
+  COURSE_ENROLLED
+  LESSON_STARTED
+  LESSON_COMPLETED
+  MODULE_COMPLETED
+  COURSE_COMPLETED
+  VIDEO_WATCH_PROGRESS
+  QUIZ_STARTED
+  QUIZ_COMPLETED
+  QUIZ_PASSED
+  // Not in the original event list but required to record the "90%+" XP
+  // tier (see XpRule QUIZ_HIGH_SCORE) as its own distinct, auditable event.
+  QUIZ_HIGH_SCORE
+  QUIZ_PERFECT_SCORE
+  ASSIGNMENT_SUBMITTED
+  ASSIGNMENT_COMPLETED
+  DISCUSSION_POST_CREATED
+  DISCUSSION_REPLY_CREATED
+  DISCUSSION_REACTION_RECEIVED
+  DISCUSSION_ANSWER_MARKED_HELPFUL
+  DISCUSSION_ANSWER_ACCEPTED
+  CERTIFICATE_EARNED
+  DAILY_LEARNING_GOAL_COMPLETED
+  STREAK_MILESTONE_REACHED
+  BADGE_EARNED
+  LEVEL_REACHED
+}
+
+enum AchievementCategory {
+  LEARNING
+  MASTERY
+  CONSISTENCY
+  COMMUNITY
+  LEARNING_TIME
+  SPECIAL
+}
+
+// Central activity ledger — every trackable learner action lands here first,
+// via lib/gamification/events.ts::recordActivityEvent(), which then
+// dispatches to XP award / streak / achievement-check logic as applicable.
+model UserActivityEvent {
+  id           String            @id @default(uuid())
+  tenantId     String            @map("tenant_id")
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  userId       String            @map("user_id")
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         ActivityEventType
+  courseId     String?           @map("course_id")
+  chapterId    String?           @map("chapter_id")
+  lessonId     String?           @map("lesson_id")
+  quizId       String?           @map("quiz_id")
+  xpAwarded    Int               @default(0) @map("xp_awarded")
+  metadataJson Json?             @map("metadata_json")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  xpTransactions UserXpTransaction[]
+
+  @@index([tenantId, userId, type])
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, type, createdAt])
+  @@index([tenantId, courseId, type])
+  @@map("user_activity_events")
+}
+
+// XP ledger — the source of truth for total XP (UserGamificationProfile.totalXp
+// is a cached, incrementally-maintained mirror of SUM(amount) for performance).
+model UserXpTransaction {
+  id                String             @id @default(uuid())
+  tenantId          String             @map("tenant_id")
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  userId            String             @map("user_id")
+  user              User               @relation("XpTransactionUser", fields: [userId], references: [id], onDelete: Cascade)
+  amount            Int
+  reason            String
+  ruleCode          String?            @map("rule_code")
+  // DB-enforced idempotency: one-time actions use a stable key (e.g.
+  // "LESSON_COMPLETED:{lessonId}"); per-attempt top-ups use a key scoped to
+  // the attempt (e.g. "QUIZ_SCORE_TIER:{quizId}:{attemptId}"). Null for
+  // legitimately repeatable entries (admin manual awards, reversals) — a
+  // unique constraint on a nullable column allows unlimited NULLs in Postgres.
+  dedupeKey         String?            @map("dedupe_key")
+  sourceEventId     String?            @map("source_event_id")
+  sourceEvent       UserActivityEvent? @relation(fields: [sourceEventId], references: [id], onDelete: SetNull)
+  relatedEntityType String?            @map("related_entity_type")
+  relatedEntityId   String?            @map("related_entity_id")
+  metadataJson      Json?              @map("metadata_json")
+  isReversed        Boolean            @default(false) @map("is_reversed")
+  reversedAt        DateTime?          @map("reversed_at")
+  reversedById      String?            @map("reversed_by")
+  reversalReason    String?            @map("reversal_reason")
+  createdByAdminId  String?            @map("created_by_admin")
+  createdByAdmin    User?              @relation("XpTransactionAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  createdAt         DateTime           @default(now()) @map("created_at")
+
+  @@unique([userId, dedupeKey])
+  @@index([tenantId, userId, createdAt])
+  @@map("user_xp_transactions")
+}
+
+// Cached per-user gamification totals for O(1) reads. The ledger
+// (UserXpTransaction) and daily-activity table remain the source of truth;
+// this row is kept in sync incrementally at write time, never recomputed
+// wholesale on read.
+model UserGamificationProfile {
+  tenantId                   String   @map("tenant_id")
+  tenant                     Tenant   @relation(fields: [tenantId], references: [id])
+  userId                     String   @id @map("user_id")
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalXp                    Int      @default(0) @map("total_xp")
+  currentStreak              Int      @default(0) @map("current_streak")
+  longestStreak              Int      @default(0) @map("longest_streak")
+  // Date-key (YYYY-MM-DD) in the user's timezone — see UserDailyLearningActivity.
+  lastQualifyingDate         String?  @map("last_qualifying_date")
+  totalActiveDays            Int      @default(0) @map("total_active_days")
+  totalLearningTimeSeconds   Int      @default(0) @map("total_learning_time_seconds")
+  totalVideoWatchTimeSeconds Int      @default(0) @map("total_video_watch_time_seconds")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@map("user_gamification_profiles")
+}
+
+// Admin-configurable (Phase 4 UI; seeded + DB-editable from day one). Levels
+// are never stored on a user — always derived from cached totalXp against
+// this list at read time, so editing thresholds later can't leave a user's
+// level stale.
+model GamificationLevel {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  order    Int
+  name     String
+  minXp    Int     @map("min_xp")
+  isActive Boolean @default(true) @map("is_active")
+
+  @@unique([order])
+  @@index([tenantId])
+  @@map("gamification_levels")
+}
+
+// Admin-configurable (Phase 4 UI; seeded + DB-editable from day one).
+// qualifyingConditionJson only ever holds a closed set of typed knobs that
+// application code interprets (e.g. {"minScorePercent": 90}) — deliberately
+// not free-form executable rule logic.
+model XpRule {
+  tenantId                String   @map("tenant_id")
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id])
+  code                    String   @id
+  label                   String
+  description             String?
+  xpAmount                Int      @map("xp_amount")
+  isActive                Boolean  @default(true) @map("is_active")
+  dailyCap                Int?     @map("daily_cap")
+  qualifyingConditionJson Json?    @map("qualifying_condition_json")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@map("xp_rules")
+}
+
+// Admin-configurable (Phase 4 UI; seeded + DB-editable from day one). `id` is
+// the stable internal badge slug (e.g. "first-step") referenced by asset
+// paths and unlock logic — never a display name or filename.
+// unlockCriteriaJson.kind is one of a closed taxonomy the achievement engine
+// (lib/gamification/achievements.ts) knows how to evaluate: LESSON_COUNT,
+// MODULE_COUNT, COURSE_COUNT, QUIZ_PASS_COUNT, QUIZ_PERFECT_COUNT,
+// QUIZ_HIGH_SCORE_COUNT, QUIZ_FIRST_ATTEMPT_HIGH, STREAK_DAYS, LEARNING_HOURS,
+// CONTRIBUTION_COUNT, HELPFUL_REACTIONS_COUNT, HELPFUL_ANSWER_COUNT,
+// FAST_STARTER, WEEKEND_STREAK, NIGHT_SESSIONS, EARLY_ADOPTER.
+model AchievementDefinition {
+  id                 String              @id
+  tenantId           String              @map("tenant_id")
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  name               String
+  description        String
+  category           AchievementCategory
+  unlockCriteriaJson Json                @map("unlock_criteria_json")
+  xpReward           Int                 @default(0) @map("xp_reward")
+  assetPath          String              @map("asset_path")
+  lockedAssetPath    String?             @map("locked_asset_path")
+  isActive           Boolean             @default(true) @map("is_active")
+  displayOrder       Int                 @default(0) @map("display_order")
+  isHidden           Boolean             @default(false) @map("is_hidden")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  userAchievements UserAchievement[]
+
+  @@index([tenantId])
+  @@map("achievement_definitions")
+}
+
+model UserAchievement {
+  id              String                @id @default(uuid())
+  tenantId        String                @map("tenant_id")
+  tenant          Tenant                @relation(fields: [tenantId], references: [id])
+  userId          String                @map("user_id")
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId   String                @map("achievement_id")
+  achievement     AchievementDefinition @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  earnedAt        DateTime              @default(now()) @map("earned_at")
+  progressCurrent Int?                  @map("progress_current")
+  // Null = unlock not yet shown to the user (drives the unlock modal / prevents
+  // it from reappearing once acknowledged — see UnlockWatcher.tsx).
+  viewedAt        DateTime?             @map("viewed_at")
+
+  @@unique([userId, achievementId])
+  @@index([tenantId])
+  @@map("user_achievements")
+}
+
+// Daily aggregate — source for the activity heatmap, streak calculation, and
+// per-course "learning time," without ever scanning raw UserActivityEvent
+// rows for these reads (see plan's Performance section).
+model UserDailyLearningActivity {
+  id                    String  @id @default(uuid())
+  tenantId              String  @map("tenant_id")
+  tenant                Tenant  @relation(fields: [tenantId], references: [id])
+  userId                String  @map("user_id")
+  user                  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Date-key (YYYY-MM-DD) in the user's timezone at the time of the activity —
+  // deliberately a string, not a DateTime, so day-boundary comparisons are
+  // exact and never re-interpreted through a different timezone later.
+  activityDate          String  @map("activity_date")
+  learningTimeSeconds   Int     @default(0) @map("learning_time_seconds")
+  videoWatchTimeSeconds Int     @default(0) @map("video_watch_time_seconds")
+  lessonsCompleted      Int     @default(0) @map("lessons_completed")
+  quizzesCompleted      Int     @default(0) @map("quizzes_completed")
+  xpEarned              Int     @default(0) @map("xp_earned")
+  isQualifyingDay       Boolean @default(false) @map("is_qualifying_day")
+
+  @@unique([userId, activityDate])
+  @@index([tenantId, activityDate])
+  @@map("user_daily_learning_activity")
+}
+
+// Per-course cumulative learning time — a separate, smaller running total
+// from UserDailyLearningActivity (which stays user-day grained, the correct
+// grain for streaks/the heatmap). Needed for Analytics Section E's per-course
+// "Learning time" without changing the streak/heatmap source's shape.
+model UserCourseLearningTime {
+  id                    String   @id @default(uuid())
+  tenantId              String   @map("tenant_id")
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  userId                String   @map("user_id")
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId              String   @map("course_id")
+  learningTimeSeconds   Int      @default(0) @map("learning_time_seconds")
+  videoWatchTimeSeconds Int      @default(0) @map("video_watch_time_seconds")
+  lastActivityAt        DateTime @default(now()) @map("last_activity_at")
+
+  @@unique([userId, courseId])
+  @@index([tenantId])
+  @@map("user_course_learning_time")
+}
+
+enum LearnerSegment {
+  HIGHLY_ENGAGED
+  ACTIVE
+  SLOWING_DOWN
+  AT_RISK
+  DORMANT
+}
+
+// Daily snapshot of each student's engagement segment (see
+// lib/analytics/learner-segments.ts for the classification logic this
+// snapshots — this table doesn't reclassify anything, it just remembers the
+// result once a day so Phase 2 can show segment transitions over time).
+// Populated by /api/cron/segment-snapshot; history starts at deployment,
+// never backfilled.
+model UserSegmentSnapshot {
+  id           String         @id @default(uuid())
+  tenantId     String         @map("tenant_id")
+  tenant       Tenant         @relation(fields: [tenantId], references: [id])
+  userId       String         @map("user_id")
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  segment      LearnerSegment
+  // Date-key (YYYY-MM-DD, UTC) the snapshot was taken for.
+  snapshotDate String         @map("snapshot_date")
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  @@unique([tenantId, userId, snapshotDate])
+  @@index([tenantId, snapshotDate])
+  @@map("user_segment_snapshots")
+}
+
+// ── Community / Discussion Board ────────────────────────────────────────
+// App-level access control only (no RLS), matching house style. Gamification
+// (XP rules / activity events / badges) already exists and is dormant — see
+// lib/gamification/events.ts's recordDiscussion* functions.
+
+enum ThreadType {
+  QUESTION
+  DISCUSSION
+  ANNOUNCEMENT
+}
+
+enum ThreadStatus {
+  ACTIVE
+  HIDDEN
+  DELETED
+}
+
+enum ReactionEntityType {
+  THREAD
+  ANSWER
+  REPLY
+}
+
+enum ReportEntityType {
+  THREAD
+  ANSWER
+  REPLY
+}
+
+enum ReportStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  OFFENSIVE
+  MISLEADING
+  INAPPROPRIATE
+  OTHER
+}
+
+enum RestrictionType {
+  TEMPORARY
+  PERMANENT
+}
+
+enum ModerationActionType {
+  EDIT
+  HIDE
+  RESTORE
+  DELETE
+  RESTORE_DELETED
+  PIN
+  UNPIN
+  LOCK
+  UNLOCK
+  MARK_RESOLVED
+  UNMARK_RESOLVED
+  ACCEPT_ANSWER
+  CHANGE_ACCEPTED_ANSWER
+  RESTRICT_USER
+  RESTORE_POSTING
+  REVIEW_REPORT
+  RESOLVE_REPORT
+  DISMISS_REPORT
+}
+
+enum CommunityVisibilityType {
+  PUBLIC
+  ENROLLED_ONLY
+}
+
+enum CommunityPostingPermission {
+  ANYONE
+  RESTRICTED
+}
+
+enum DiscussionNotificationType {
+  ANSWERED_QUESTION
+  REPLIED_TO_THREAD
+  REPLIED_TO_ANSWER
+  ANSWER_ACCEPTED
+  THREAD_PINNED
+  THREAD_LOCKED
+  MODERATION_ACTION
+  FOLLOWED_THREAD_ACTIVITY
+}
+
+enum CommunitySortOrder {
+  LATEST
+  POPULAR
+  UNANSWERED
+}
+
+enum AnnouncementCreatorRole {
+  ADMIN_ONLY
+}
+
+model CommunityCategory {
+  id                String                     @id @default(uuid())
+  tenantId          String                     @map("tenant_id")
+  tenant            Tenant                     @relation(fields: [tenantId], references: [id])
+  name              String
+  slug              String                     @unique
+  description       String?
+  displayOrder      Int                        @default(0) @map("display_order")
+  isActive          Boolean                    @default(true) @map("is_active")
+  visibilityType    CommunityVisibilityType    @default(PUBLIC) @map("visibility_type")
+  postingPermission CommunityPostingPermission @default(ANYONE) @map("posting_permission")
+  createdById       String                     @map("created_by")
+  createdBy         User                       @relation("CommunityCategoryCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime                   @default(now()) @map("created_at")
+  updatedAt         DateTime                   @updatedAt @map("updated_at")
+
+  threads DiscussionThread[]
+
+  @@index([tenantId])
+  @@map("community_categories")
+}
+
+model DiscussionThread {
+  id         String             @id @default(uuid())
+  tenantId   String             @map("tenant_id")
+  tenant     Tenant             @relation(fields: [tenantId], references: [id])
+  authorId   String             @map("author_id")
+  author     User               @relation("DiscussionThreadAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  categoryId String?            @map("category_id")
+  category   CommunityCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  courseId   String?            @map("course_id")
+  course     Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  title      String
+  bodyHtml   String             @map("body_html")
+  threadType ThreadType         @default(DISCUSSION) @map("thread_type")
+  status     ThreadStatus       @default(ACTIVE)
+
+  isPinned   Boolean @default(false) @map("is_pinned")
+  isLocked   Boolean @default(false) @map("is_locked")
+  isResolved Boolean @default(false) @map("is_resolved")
+
+  acceptedAnswerId String?           @unique @map("accepted_answer_id")
+  acceptedAnswer   DiscussionAnswer? @relation("ThreadAcceptedAnswer", fields: [acceptedAnswerId], references: [id], onDelete: SetNull)
+
+  viewCount Int @default(0) @map("view_count")
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+
+  hiddenAt       DateTime? @map("hidden_at")
+  hiddenById     String?   @map("hidden_by")
+  hiddenBy       User?     @relation("DiscussionThreadHiddenBy", fields: [hiddenById], references: [id], onDelete: SetNull)
+  deletedAt      DateTime? @map("deleted_at")
+  deletedById    String?   @map("deleted_by")
+  deletedBy      User?     @relation("DiscussionThreadDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  deletionReason String?   @map("deletion_reason")
+
+  answers DiscussionAnswer[] @relation("ThreadAnswers")
+  replies DiscussionReply[]
+  follows DiscussionFollow[]
+
+  @@index([tenantId, courseId])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, authorId])
+  @@index([tenantId, threadType])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, lastActivityAt])
+  @@index([tenantId, isResolved])
+  @@index([tenantId, isPinned])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, hiddenAt])
+  @@map("discussion_threads")
+}
+
+model DiscussionAnswer {
+  id       String           @id @default(uuid())
+  tenantId String           @map("tenant_id")
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  threadId String           @map("thread_id")
+  thread   DiscussionThread @relation("ThreadAnswers", fields: [threadId], references: [id], onDelete: Cascade)
+  authorId String           @map("author_id")
+  author   User             @relation("DiscussionAnswerAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  bodyHtml String           @map("body_html")
+
+  isAccepted Boolean @default(false) @map("is_accepted")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  editedAt  DateTime? @map("edited_at")
+
+  hiddenAt       DateTime? @map("hidden_at")
+  hiddenById     String?   @map("hidden_by")
+  hiddenBy       User?     @relation("DiscussionAnswerHiddenBy", fields: [hiddenById], references: [id], onDelete: SetNull)
+  deletedAt      DateTime? @map("deleted_at")
+  deletedById    String?   @map("deleted_by")
+  deletedBy      User?     @relation("DiscussionAnswerDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  deletionReason String?   @map("deletion_reason")
+
+  replies          DiscussionReply[]
+  acceptedOnThread DiscussionThread? @relation("ThreadAcceptedAnswer")
+
+  @@index([tenantId, threadId])
+  @@index([tenantId, authorId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, hiddenAt])
+  @@map("discussion_answers")
+}
+
+model DiscussionReply {
+  id       String            @id @default(uuid())
+  tenantId String            @map("tenant_id")
+  tenant   Tenant            @relation(fields: [tenantId], references: [id])
+  threadId String            @map("thread_id")
+  thread   DiscussionThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  answerId String?           @map("answer_id")
+  answer   DiscussionAnswer? @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  authorId String            @map("author_id")
+  author   User              @relation("DiscussionReplyAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  bodyHtml String            @map("body_html")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  editedAt  DateTime? @map("edited_at")
+
+  hiddenAt       DateTime? @map("hidden_at")
+  hiddenById     String?   @map("hidden_by")
+  hiddenBy       User?     @relation("DiscussionReplyHiddenBy", fields: [hiddenById], references: [id], onDelete: SetNull)
+  deletedAt      DateTime? @map("deleted_at")
+  deletedById    String?   @map("deleted_by")
+  deletedBy      User?     @relation("DiscussionReplyDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  deletionReason String?   @map("deletion_reason")
+
+  @@index([tenantId, threadId])
+  @@index([tenantId, answerId])
+  @@index([tenantId, authorId])
+  @@map("discussion_replies")
+}
+
+model DiscussionReaction {
+  id           String             @id @default(uuid())
+  tenantId     String             @map("tenant_id")
+  tenant       Tenant             @relation(fields: [tenantId], references: [id])
+  userId       String             @map("user_id")
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entityType   ReactionEntityType @map("entity_type")
+  entityId     String             @map("entity_id")
+  reactionType String             @default("LIKE") @map("reaction_type")
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  @@unique([userId, entityType, entityId, reactionType])
+  @@index([tenantId, entityType, entityId])
+  @@map("discussion_reactions")
+}
+
+model DiscussionFollow {
+  id        String           @id @default(uuid())
+  tenantId  String           @map("tenant_id")
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  userId    String           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  threadId  String           @map("thread_id")
+  thread    DiscussionThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@unique([userId, threadId])
+  @@index([tenantId])
+  @@map("discussion_follows")
+}
+
+model DiscussionReport {
+  id         String           @id @default(uuid())
+  tenantId   String           @map("tenant_id")
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  reporterId String           @map("reporter_id")
+  reporter   User             @relation("DiscussionReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  entityType ReportEntityType @map("entity_type")
+  entityId   String           @map("entity_id")
+  reason     ReportReason
+  details    String?
+  status     ReportStatus     @default(OPEN)
+
+  reviewedById    String?   @map("reviewed_by")
+  reviewedBy      User?     @relation("DiscussionReportReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime? @map("reviewed_at")
+  resolutionNotes String?   @map("resolution_notes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, status])
+  @@index([tenantId, reporterId])
+  @@map("discussion_reports")
+}
+
+model CommunityUserRestriction {
+  id              String          @id @default(uuid())
+  tenantId        String          @map("tenant_id")
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  userId          String          @map("user_id")
+  user            User            @relation("CommunityUserRestrictionUser", fields: [userId], references: [id], onDelete: Cascade)
+  restrictionType RestrictionType @map("restriction_type")
+  reason          String
+  startsAt        DateTime        @default(now()) @map("starts_at")
+  expiresAt       DateTime?       @map("expires_at")
+  createdById     String          @map("created_by")
+  createdBy       User            @relation("CommunityUserRestrictionCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime        @default(now()) @map("created_at")
+  liftedById      String?         @map("lifted_by")
+  liftedBy        User?           @relation("CommunityUserRestrictionLiftedBy", fields: [liftedById], references: [id], onDelete: SetNull)
+  liftedAt        DateTime?       @map("lifted_at")
+
+  @@index([tenantId, userId])
+  @@map("community_user_restrictions")
+}
+
+model CommunityModerationLog {
+  id              String               @id @default(uuid())
+  tenantId        String               @map("tenant_id")
+  tenant          Tenant               @relation(fields: [tenantId], references: [id])
+  actorId         String               @map("actor_id")
+  actor           User                 @relation("CommunityModerationLogActor", fields: [actorId], references: [id])
+  actionType      ModerationActionType @map("action_type")
+  targetUserId    String?              @map("target_user_id")
+  targetUser      User?                @relation("CommunityModerationLogTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  entityType      String?              @map("entity_type")
+  entityId        String?              @map("entity_id")
+  threadId        String?              @map("thread_id")
+  previousState   String?              @map("previous_state")
+  newState        String?              @map("new_state")
+  previousContent String?              @map("previous_content")
+  newContent      String?              @map("new_content")
+  reason          String?
+  createdAt       DateTime             @default(now()) @map("created_at")
+
+  @@index([tenantId, actorId])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, threadId])
+  @@index([tenantId, createdAt])
+  @@map("community_moderation_logs")
+}
+
+model DiscussionNotification {
+  id         String                     @id @default(uuid())
+  tenantId   String                     @map("tenant_id")
+  tenant     Tenant                     @relation(fields: [tenantId], references: [id])
+  userId     String                     @map("user_id")
+  user       User                       @relation("DiscussionNotificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  type       DiscussionNotificationType
+  actorId    String?                    @map("actor_id")
+  actor      User?                      @relation("DiscussionNotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  threadId   String?                    @map("thread_id")
+  answerId   String?                    @map("answer_id")
+  replyId    String?                    @map("reply_id")
+  groupCount Int                        @default(1) @map("group_count")
+  readAt     DateTime?                  @map("read_at")
+  createdAt  DateTime                   @default(now()) @map("created_at")
+
+  @@index([tenantId, userId, readAt])
+  @@index([tenantId, userId, createdAt])
+  @@map("discussion_notifications")
+}
+
+// Single-row table (singleton, like Settings) for community-wide feature
+// toggles and defaults.
+model CommunitySettings {
+  tenantId                      String                  @id @map("tenant_id")
+  tenant                        Tenant                  @relation(fields: [tenantId], references: [id])
+  communityEnabled              Boolean                 @default(true) @map("community_enabled")
+  courseDiscussionsEnabled      Boolean                 @default(true) @map("course_discussions_enabled")
+  allowGlobalDiscussionCreation Boolean                 @default(true) @map("allow_global_discussion_creation")
+  allowCourseQuestions          Boolean                 @default(true) @map("allow_course_questions")
+  allowLikes                    Boolean                 @default(true) @map("allow_likes")
+  allowReporting                Boolean                 @default(true) @map("allow_reporting")
+  allowImageUploads             Boolean                 @default(true) @map("allow_image_uploads")
+  maxImageSizeMb                Int                     @default(5) @map("max_image_size_mb")
+  allowedImageFormats           String[]                @default(["jpg", "jpeg", "png", "webp"]) @map("allowed_image_formats")
+  allowPostEditing              Boolean                 @default(true) @map("allow_post_editing")
+  allowAnswerEditing            Boolean                 @default(true) @map("allow_answer_editing")
+  allowReplyEditing             Boolean                 @default(true) @map("allow_reply_editing")
+  autoFollowOnParticipation     Boolean                 @default(true) @map("auto_follow_on_participation")
+  defaultSortOrder              CommunitySortOrder      @default(LATEST) @map("default_sort_order")
+  announcementCreatorRole       AnnouncementCreatorRole @default(ADMIN_ONLY) @map("announcement_creator_role")
+  updatedAt                     DateTime                @updatedAt @map("updated_at")
+
+  @@map("community_settings")
+}
