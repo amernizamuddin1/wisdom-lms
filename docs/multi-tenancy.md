@@ -561,6 +561,121 @@ uuid, not a data loss).
   Supabase project, so no cloud-side rollback is needed for anything in this
   section.
 
+## Supabase staging migration (2026-07-17)
+
+Applied all 33 migrations (the 27 pre-tenancy + 6 tenancy migrations listed
+above) to the real Supabase **staging** project (`wxhesjgjlufjwwtahqsu`,
+region `ap-south-1`) via `.env.staging.local` — the first run against a real
+Supabase project rather than local `prisma dev`. **Result: PASS. All 33
+migrations applied cleanly to a database that started completely empty.
+Production (`peqzxcbtawpvijzllkdw`) was never touched; RLS was not enabled.**
+
+### Safety-guard changes made this pass
+
+- `scripts/staging/env.ts` was rewritten: it previously only allowed
+  `localhost`/`127.0.0.1`, which blocked every real Supabase project
+  including staging. It now:
+  - Extracts the Supabase project ref from either connection-string shape
+    (pooled: `postgres.<ref>` username; direct: `db.<ref>.supabase.co` host).
+  - Explicitly allows only `wxhesjgjlufjwwtahqsu` (staging) or
+    `localhost`/`127.0.0.1` (local `prisma dev`, still supported).
+  - Explicitly blocks `peqzxcbtawpvijzllkdw` (production) with its own error
+    message, even if it would otherwise match a recognized connection-string
+    shape — this check runs before the generic unknown-ref rejection.
+  - Refuses to run for any other/unparseable project ref (whitelist, not a
+    generic "any Supabase host" check, per instructions).
+  - Validates both `DATABASE_URL` and `DIRECT_URL` (the latter is what
+    `prisma.config.ts` actually uses for `migrate deploy`).
+  - Confirms `.env.staging.local` is covered by `.gitignore` before
+    proceeding.
+  - Prints only redacted host/ref/user-prefix info, never full connection
+    strings or passwords.
+- New `scripts/staging/migrate.ts` wrapper: imports `./env` first (so the
+  guard runs and staging values are loaded into `process.env` with
+  `override: true`), then spawns `npx prisma migrate deploy` with that same
+  `process.env`. This matters because `prisma.config.ts` does
+  `import "dotenv/config"`, which loads the repo-root `.env` (production
+  credentials) — but `dotenv.config()` never overwrites a variable that's
+  already set, so by pre-populating `DATABASE_URL`/`DIRECT_URL` from staging
+  before Prisma's own dotenv import runs, production's values in `.env` are
+  never used by the child process.
+
+Verified independently of any live DB connection: the ref-extraction/
+allow/block logic was unit-tested against staging/production/unknown/
+localhost connection strings in both pooled and direct shapes (all correct),
+and `npx prisma generate`, `npx prisma validate`, `npx tsc --noEmit` all pass
+clean against the current schema.
+
+### Credential troubleshooting (resolved)
+
+The password in `.env.staging.local` was reset five times over the course of
+this session before a working one was confirmed — Postgres kept rejecting it
+(`28P01 password authentication failed for user "postgres"`), cross-checked
+with a raw `pg.Client` connection and `dotenv.parse()` independently of the
+guard's own parsing to rule out a parsing bug (none found). One relevant
+caveat surfaced during troubleshooting: Supabase's dashboard SQL Editor
+authenticates via the dashboard session, **not** the database password, so
+"it works in the SQL Editor" does not validate a connection string's
+password — use the **Connect → copy URI** button (which fills the password
+in automatically) rather than hand-typing/pasting it into the template. The
+final reset (via the dashboard's password field) worked on the pooler host
+on both port 6543 (transaction mode, `pgbouncer=true`) and port 5432
+(session mode). The direct hostname (`db.<ref>.supabase.co`) does not
+resolve from this machine (`ENOTFOUND`) — this project has no IPv4 direct
+connection, only the pooler, which is what `DATABASE_URL`/`DIRECT_URL` both
+use.
+
+### Migration run
+
+With a working connection confirmed, `scripts/staging/migrate.ts` (see
+above) ran `prisma migrate deploy` against a **completely empty** staging
+database (no pre-existing tables/rows) — all 33 migrations applied in
+sequence with no errors, `prisma migrate status` afterward reports "Database
+schema is up to date!" with zero pending migrations.
+
+**Verification (`scripts/staging/verify-migration.ts`), 2 documented
+non-failures:**
+- `_prisma_migrations`: 33 rows, 0 with `finished_at IS NULL` (0 failed).
+- `tenants`/`tenant_memberships` tables exist; 1 `tenants` row (the
+  `WisdomQuant` tenant, created unconditionally by
+  `20260716050200_backfill_default_tenant` regardless of whether there was
+  any pre-existing data to backfill), 0 `tenant_memberships` rows (correct —
+  0 pre-existing `users`).
+- Every tenant-owned table: `tenant_id` present, `NOT NULL`, zero NULLs,
+  zero non-empty-but-wrong-tenant rows (trivially true — every tenant table
+  except the seeded catalogs below has 0 rows in this empty database).
+- `gamification_levels` (8), `xp_rules` (16), `achievement_definitions`
+  (32), `community_settings` (1) are non-zero because those four are seeded
+  directly by their own migrations
+  (`20260714182044_seed_gamification_defaults`,
+  `20260715093500_seed_community_defaults`) — expected, not app data.
+- FKs/unique constraints/indexes spot-checked and present
+  (`courses_tenant_id_fkey`, `tenant_memberships_tenant_id_user_id_key`, 5
+  `tenant_id`-prefixed indexes on `quiz_attempts`).
+- `wisdom_lms_app` role exists, `NOBYPASSRLS`. **RLS confirmed NOT enabled**
+  (`relrowsecurity = false` on `courses` and `tenant_memberships`); 59
+  scaffolded policies exist but are inert, exactly as designed.
+- **2 checks the script reports FAIL, both expected, not real defects**:
+  `settings: exactly one row` and `settings row is keyed on the WisdomQuant
+  tenant id` — the script's assumption (a legacy singleton row exists to be
+  converted) held on the earlier local-`prisma dev` pass because
+  `seed-legacy-data.ts` inserted a pre-migration `settings` row before
+  migrating. This real staging database started genuinely empty and no
+  migration seeds `settings` (confirmed: only `community_settings` has an
+  `INSERT` in its migration SQL) — 0 rows is the correct state for a
+  database no app instance has ever written to. The row will appear the
+  first time the app reads/writes `Settings` for a tenant.
+
+**Not run this pass**: the DB-backed integration test suite
+(`src/__tests__/integration`, needs `TEST_DATABASE_URL`) was deliberately
+**not** pointed at this staging database — running it would write/delete
+test fixture data, undoing the "cleanly migrated, still empty" state just
+verified above, and wasn't explicitly requested against this environment.
+The unit suite (`npm test`, no `TEST_DATABASE_URL`) was re-run and passes:
+95 passed, 54 skipped (the same 54 that need `TEST_DATABASE_URL`).
+`npx prisma generate`, `npx prisma validate`, `npx tsc --noEmit` all pass
+clean.
+
 ## Production deployment checklist
 
 - [x] ~~Run the 5 migrations against a database and verify them~~ — done
@@ -607,3 +722,156 @@ uuid, not a data loss).
   printed, no errors) building from a copy on `C:\` this pass; CI/production
   build environments are unaffected (they don't run on this machine's `F:`
   drive).
+
+## Supabase staging fixture seed + tenant-isolation validation (2026-07-17, Step 4.2)
+
+Builds on "Supabase staging migration" above — that pass applied all 33
+migrations to an empty staging database; this pass seeds controlled fixture
+data on top of it and validates tenant isolation. **Production
+(`peqzxcbtawpvijzllkdw`) was not touched. RLS remains disabled** (confirmed:
+`relrowsecurity = false` on `courses`, unchanged from the migration pass).
+
+### Fixture seed
+
+`scripts/staging/seed-tenant-fixtures.ts` run against staging
+(`wxhesjgjlufjwwtahqsu`), guarded by the same `scripts/staging/env.ts` checks
+as every other staging script. Starting state: 1 tenant (WisdomQuant), 0
+users. **Result: PASS.**
+
+Seeded:
+- **WisdomQuant** (existing tenant, fixed id): 1 admin, 1 learner, 2 courses
+  (one with a price), 1 bundle (wrapping course 2, with its own price), 1
+  enrollment, 1 paid order (with order item + Razorpay payment record), 1
+  Settings row, 1 CommunitySettings row, 1 notification (+ recipient), 1 quiz
+  (+ question) with 1 passed attempt, 1 gamification profile + 1 XP
+  transaction, 1 community category, 1 discussion thread.
+- **Demo Academy** (brand-new second tenant, fixed id): identical shape to
+  WisdomQuant above — 1 admin, 1 learner, 2 courses, 1 bundle, 1 enrollment,
+  1 paid order, Settings/CommunitySettings, 1 notification, 1 quiz + attempt,
+  gamification profile + XP transaction, 1 community category, 1 discussion
+  thread.
+- **1 shared global user** ("Cross Tenant User") with two independent
+  `TenantMembership` rows: `STUDENT` in WisdomQuant, `ADMIN` in Demo Academy.
+
+Bundles, orders/payment records, settings/community settings, notifications,
+and quiz/gamification data were all seeded — the script supports every
+category requested for this pass.
+
+### Post-seed verification (`scripts/staging/verify-fixtures.ts`, new)
+
+**Result: ALL CHECKS PASSED.** Counts: 2 tenants, 5 users, 6
+`tenant_memberships`, 4 courses, 2 bundles, 2 enrollments, 2 orders, 2
+`order_payments`, 2 `settings`, 2 `community_settings`, 2 notifications, 2
+quizzes, 2 quiz_attempts, 2 `user_xp_transactions`, 2
+`user_gamification_profiles`, 2 `community_categories`, 2
+`discussion_threads`. Per tenant: 2 courses, 3 memberships (admin + learner +
+the shared cross-tenant user), 1 enrollment, 1 order. Every tenant-owned
+table checked (20 tables spanning courses, bundles, commerce, notifications,
+quizzes, gamification, community, `tenant_memberships`,
+`settings`/`community_settings`) has **zero NULL `tenant_id` rows**. The
+shared user has exactly 2 `TenantMembership` rows, one per tenant, with
+different roles.
+
+### DB-backed integration test suite — run locally, staging guard left intact
+
+Per explicit instruction this pass, **the built-in `TEST_DATABASE_URL`
+localhost-only guard in `src/__tests__/integration/db-helper.ts` was not
+loosened** — it exists because that suite's cleanup is best-effort
+(non-transactional deletes), which is unsafe to run unmodified against a
+shared hosted database. Instead:
+
+- The full suite ran against the local, disposable `prisma dev` staging DB
+  (`wisdom-lms-staging`, already set up from the earlier local staging
+  validation pass) via `TEST_DATABASE_URL=<local prisma dev TCP url> npx
+  vitest run src/__tests__/integration --no-file-parallelism`. **Result:
+  PASS — 12 files, 54/54 tests passed, 0 failed.**
+- The unit suite (`npx vitest run`, no `TEST_DATABASE_URL`) also re-ran
+  clean: **95/95 passed, 54 skipped** (the same 54 that need
+  `TEST_DATABASE_URL`).
+
+### Targeted staging isolation validation (`scripts/staging/verify-tenant-isolation.ts`, new)
+
+Since the vitest integration suite deliberately wasn't pointed at Supabase
+staging, a separate, narrowly-scoped script validates tenant isolation
+directly against the seeded staging fixtures. It re-applies the *real*
+production scoping logic (`applyTenantScope`/`TENANT_SCOPED_MODELS` from
+`src/lib/tenant-scoping.ts`, imported directly — these are pure and
+`server-only`-free, unlike `src/lib/prisma.ts`/`tenant-context.ts`, which
+can't load outside a Next.js runtime) against a locally-built extended
+Prisma client, driven by the same `AsyncLocalStorage` pattern the app uses.
+**Result: ALL CHECKS PASSED.**
+
+- **Cross-tenant READ blocked**: a WisdomQuant-scoped client's `findUnique`
+  and `findMany` on `Course` never returns/lists a Demo Academy course.
+- **Cross-tenant UPDATE/DELETE blocked**: using a disposable temp course
+  created in Demo Academy (never real fixture data), a WisdomQuant-scoped
+  `updateMany`/`deleteMany` targeting that course's id affects **0 rows**;
+  the row's title is confirmed unchanged and the row confirmed still present
+  afterward. The temp row was deleted via the unscoped platform client as
+  cleanup immediately after.
+- **`TenantMembership` isolation**: exactly one user (the intentional
+  cross-tenant fixture user) has membership rows in both tenants; every
+  other membership is single-tenant.
+- **Settings/CommunitySettings isolation**: both tenants have their own
+  `Settings` row with distinct `primaryColor` values — no shared singleton
+  leak.
+- **Razorpay webhook tenant resolution** (DB-level check, not the full
+  HTTP/HMAC path — no live webhook secret configured on staging):
+  `notes.tenantId` resolves correctly to each tenant by id, an unknown id
+  resolves to `null` (the route's actual 400-and-reject path), and the
+  `DEFAULT_TENANT_SLUG="wisdomquant"` fallback for legacy no-notes orders
+  resolves correctly.
+- **Learner-segment cron isolation**: not re-executed against staging in
+  this script — `getAllLearnerSegments()` and `/api/cron/segment-snapshot`
+  both transitively import `server-only`-guarded modules that can't load
+  outside a Next.js build/runtime, and reimplementing the cron's actual
+  learner-resolution logic in a standalone script would test a copy, not the
+  real code. The underlying mechanism (`TenantMembership`-scoped learner
+  resolution + `UserSegmentSnapshot`'s tenant-scoped unique constraint) was
+  exercised end-to-end this same session by
+  `tenant-segment-isolation.integration.test.ts` (3/3 passed, see above)
+  against the local `prisma dev` staging DB — treat that as this pass's
+  behavioral proof. A true staging-Supabase-backed run of the cron route
+  would need a deployed instance with `DATABASE_URL`/`CRON_SECRET` pointed
+  at staging; out of scope for a CLI script.
+
+### Incident during this pass (caught, no data impact)
+
+`scripts/staging/verify-tenant-isolation.ts` initially imported the fixed
+tenant/user id constants from `seed-tenant-fixtures.ts`. That file has no
+`require.main` guard around its `main().catch(...)` call, so the import
+silently re-triggered a full re-seed run concurrently with the isolation
+script. The isolation script errored (unrelated `AsyncLocalStorage` bug) and
+exited before the re-triggered seed's `db.user.create()` calls could
+complete, so it failed on a unique-constraint conflict without writing
+anything — `verify-fixtures.ts` was re-run immediately after and confirmed
+row counts were unchanged (4 courses, 6 memberships, etc., identical to
+pre-incident). Worked around at the time by duplicating the three constant
+ids directly in `verify-tenant-isolation.ts` instead of importing them; the
+missing `require.main` guard was flagged as a latent footgun and fixed
+properly in Step 4.3 below.
+
+### Files added this pass
+
+- `scripts/staging/verify-fixtures.ts` — post-seed count/ownership checks.
+- `scripts/staging/verify-tenant-isolation.ts` — targeted cross-tenant
+  read/update/delete, membership, settings, and webhook-resolution checks
+  against staging.
+
+Neither is part of the permanent staging script suite documented above; both
+are one-off validation scripts for this pass, safe to re-run (idempotent
+reads, and the one write path cleans up its own temp row).
+
+## Staging validation tooling hardening (2026-07-17, Step 4.3)
+
+Follow-up to the Step 4.2 incident above: `seed-tenant-fixtures.ts` now
+guards its `main()` call with `if (require.main === module)`, so importing
+the file (e.g. for its exported `WISDOMQUANT_TENANT_ID`/
+`DEMO_ACADEMY_TENANT_ID`/`CROSS_TENANT_USER_ID` constants) never re-triggers
+a seed run. `verify-fixtures.ts` and `verify-tenant-isolation.ts` were
+switched from duplicating those three constants to importing them directly
+from `seed-tenant-fixtures.ts`, removing the duplication the Step 4.2
+workaround left behind.
+
+No schema, migration, or scoping-logic changes in this pass — tooling only.
+Production was not touched; RLS remains disabled.
