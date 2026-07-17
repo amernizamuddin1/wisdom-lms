@@ -33,10 +33,13 @@ vi.mock("@/lib/tenant-context", () => ({
   getTenantId: () => mockGetTenantId(),
 }));
 
-const { requireAdmin, requireUser, getOptionalUser } = await import("@/lib/auth");
+const { requireAdmin, requireUser, getOptionalUser, resolvePostLoginPath } = await import("@/lib/auth");
 
 const TENANT_ID = "tenant-1";
 const PROFILE = { id: "user-1", name: "Ada", email: "ada@example.com" };
+
+const WISDOMQUANT_TENANT_ID = "tenant-wisdomquant";
+const DEMO_ACADEMY_TENANT_ID = "tenant-demo-academy";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -133,5 +136,67 @@ describe("getOptionalUser", () => {
     mockUserFindUnique.mockResolvedValue(PROFILE);
     mockMembershipFindUnique.mockResolvedValue({ role: "STUDENT", status: "ACTIVE" });
     await expect(getOptionalUser()).resolves.toEqual(PROFILE);
+  });
+});
+
+describe("resolvePostLoginPath", () => {
+  it("sends a WisdomQuant ADMIN membership to /admin", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+    mockUserFindUnique.mockResolvedValue(PROFILE);
+    mockGetTenantId.mockResolvedValue(WISDOMQUANT_TENANT_ID);
+    mockMembershipFindUnique.mockResolvedValue({ role: "ADMIN", status: "ACTIVE" });
+    await expect(resolvePostLoginPath()).resolves.toBe("/admin");
+  });
+
+  it("sends a WisdomQuant STUDENT membership to /dashboard", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+    mockUserFindUnique.mockResolvedValue(PROFILE);
+    mockGetTenantId.mockResolvedValue(WISDOMQUANT_TENANT_ID);
+    mockMembershipFindUnique.mockResolvedValue({ role: "STUDENT", status: "ACTIVE" });
+    await expect(resolvePostLoginPath()).resolves.toBe("/dashboard");
+  });
+
+  it("sends a Demo Academy ADMIN membership to /admin", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+    mockUserFindUnique.mockResolvedValue(PROFILE);
+    mockGetTenantId.mockResolvedValue(DEMO_ACADEMY_TENANT_ID);
+    mockMembershipFindUnique.mockResolvedValue({ role: "ADMIN", status: "ACTIVE" });
+    await expect(resolvePostLoginPath()).resolves.toBe("/admin");
+  });
+
+  it("sends a Demo Academy STUDENT membership to /dashboard", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+    mockUserFindUnique.mockResolvedValue(PROFILE);
+    mockGetTenantId.mockResolvedValue(DEMO_ACADEMY_TENANT_ID);
+    mockMembershipFindUnique.mockResolvedValue({ role: "STUDENT", status: "ACTIVE" });
+    await expect(resolvePostLoginPath()).resolves.toBe("/dashboard");
+  });
+
+  it("resolves a cross-tenant shared user by the active tenant's membership, not any other tenant's", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+    mockUserFindUnique.mockResolvedValue(PROFILE);
+
+    // Same user is STUDENT on WisdomQuant but ADMIN on Demo Academy — the
+    // active tenant (set by proxy.ts from the request host) must be the only
+    // thing that decides the destination.
+    mockGetTenantId.mockResolvedValueOnce(WISDOMQUANT_TENANT_ID);
+    mockMembershipFindUnique.mockResolvedValueOnce({ role: "STUDENT", status: "ACTIVE" });
+    await expect(resolvePostLoginPath()).resolves.toBe("/dashboard");
+
+    mockGetTenantId.mockResolvedValueOnce(DEMO_ACADEMY_TENANT_ID);
+    mockMembershipFindUnique.mockResolvedValueOnce({ role: "ADMIN", status: "ACTIVE" });
+    await expect(resolvePostLoginPath()).resolves.toBe("/admin");
+  });
+
+  it("sends unauthenticated callers to /login", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    await expect(resolvePostLoginPath()).resolves.toBe("/login");
+  });
+
+  it("sends a removed membership to /login rather than either dashboard", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+    mockUserFindUnique.mockResolvedValue(PROFILE);
+    mockMembershipFindUnique.mockResolvedValue({ role: "ADMIN", status: "REMOVED" });
+    await expect(resolvePostLoginPath()).resolves.toBe("/login");
   });
 });

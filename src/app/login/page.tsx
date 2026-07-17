@@ -40,7 +40,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push("/post-login");
     router.refresh();
   }
 

@@ -16,6 +16,28 @@ async function getActiveMembership(userId: string) {
   });
 }
 
+// Called right after a successful Supabase sign-in to decide where to send
+// the browser. Resolves purely from TenantMembership.role in the active
+// tenant (never from email) so the same login form works for every role and
+// every tenant, and a cross-tenant user lands on the right destination for
+// whichever tenant they signed in on.
+export async function resolvePostLoginPath(): Promise<string> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return "/login";
+
+  const profile = await prisma.user.findUnique({ where: { id: user.id } });
+  if (!profile) return "/login";
+
+  const membership = await getActiveMembership(profile.id);
+  if (!membership || membership.status !== "ACTIVE") return "/login";
+
+  return membership.role === "ADMIN" ? "/admin" : "/dashboard";
+}
+
 export async function requireAdmin(): Promise<User> {
   const supabase = await createClient();
   const {
