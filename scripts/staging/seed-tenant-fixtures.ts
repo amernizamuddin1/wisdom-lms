@@ -5,12 +5,23 @@
 // Also seeds one global user who is a member of BOTH tenants (different
 // roles), covering the multi-tenant-membership case.
 //
-// Uses the raw, unscoped client from ./db.ts — safe here because every
-// create below stamps tenantId explicitly, unlike ordinary app code which
-// must always go through the auto-scoped `prisma` export in
-// src/lib/prisma.ts instead.
+// Uses the raw, unscoped client from ./db.ts for most rows — safe here
+// because every create below stamps tenantId explicitly, unlike ordinary app
+// code which must always go through the auto-scoped `prisma` export in
+// src/lib/prisma.ts instead. The one exception is the gamification award
+// engine (evaluateAchievements): that logic must not be duplicated with raw
+// inserts, so it's invoked for real, scoped via runWithTenantContext, after
+// the raw QuizAttempt/XP rows it depends on are created.
+//
+// Run with: npx tsx --conditions=react-server scripts/staging/seed-tenant-fixtures.ts
+// (the --conditions flag is required because this script, via @/lib/prisma,
+// now transitively imports "server-only", which throws unless resolved
+// through its react-server export condition — see docs/multi-tenancy.md.)
 import { db } from "./db";
 import { randomUUID } from "crypto";
+import { prisma } from "@/lib/prisma";
+import { runWithTenantContext } from "@/lib/tenant-context";
+import { evaluateAchievements } from "@/lib/gamification/achievements";
 
 export const WISDOMQUANT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 export const DEMO_ACADEMY_TENANT_ID = "00000000-0000-0000-0000-000000000002";
@@ -181,6 +192,25 @@ async function seedTenant(tenantId: string, name: string, slug: string): Promise
   await db.userXpTransaction.create({
     data: { tenantId, userId: ids.learner, amount: 50, reason: "Quiz passed" },
   });
+
+  // The raw `db` client above intentionally bypasses recordQuizAttempt() (the
+  // real quiz-submission pipeline), so nothing has ever called
+  // evaluateAchievements() for this learner. Without this, the four quiz
+  // badges satisfied by the QuizAttempt just created (first-quiz,
+  // perfect-score, high-achiever, first-attempt-ace) would compute 100%
+  // progress on the Achievements page forever while staying unearned/
+  // grayscale, since nothing else in this fixture ever re-triggers a
+  // QUIZ_* evaluation. Route through the real award engine so seeded data
+  // converges to the same state real usage would produce.
+  await runWithTenantContext({ tenantId, tenantSlug: slug }, () =>
+    prisma.$transaction((tx) =>
+      evaluateAchievements(tx, {
+        userId: ids.learner,
+        relevantKinds: ["QUIZ_PASS_COUNT", "QUIZ_PERFECT_COUNT", "QUIZ_HIGH_SCORE_COUNT", "QUIZ_FIRST_ATTEMPT_HIGH"],
+        quizId: ids.quiz,
+      }),
+    ),
+  );
 
   await db.communityCategory.create({
     data: { id: ids.category, tenantId, name: "General", slug: `${slug}-general`, createdById: ids.admin },

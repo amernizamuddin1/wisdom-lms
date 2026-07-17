@@ -1026,3 +1026,63 @@ non-member away from any gated page to `/login`) was already correct and
 tenant-safe; only the *first* redirect after login lacked a clear message.
 Deployment Protection was left enabled (only the automation-bypass secret
 was added) — Preview is not publicly reachable as a result of this pass.
+
+## Achievements page bug: fixture data bypassed the award engine (2026-07-17)
+
+**Symptom:** on staging, `wisdomquant-fixture-learner@example.test`'s
+Achievements page showed "0 of 30 earned" while four Mastery badges (First
+Quiz, Perfect Score, High Achiever, First-Attempt Ace) displayed "1 of 1"
+progress and stayed grayscale/locked — progress and earned state
+contradicting each other.
+
+**Root cause:** `scripts/staging/seed-tenant-fixtures.ts` created the
+fixture learner's `QuizAttempt`/XP rows directly via the raw, unscoped `db`
+client, bypassing `recordQuizAttempt()` (`src/lib/gamification/events.ts`) —
+the only code path that calls `evaluateAchievements()`
+(`src/lib/gamification/achievements.ts`) for quiz criteria. No
+`UserAchievement` row was ever created, so `earned` stayed `false` forever,
+while the page's live progress computation
+(`getAchievementsPageData`/`computeAchievementProgress`) read the
+`QuizAttempt` row directly and correctly reported 100% progress — hence the
+contradiction. The award engine, the Achievements page, badge styling, and
+tenant scoping were all working correctly off the data they were given.
+
+**Fix:**
+- `scripts/staging/seed-tenant-fixtures.ts` now calls the real
+  `evaluateAchievements()` (scoped via `runWithTenantContext`) right after
+  seeding the fixture learner's quiz/XP rows, so seeded data converges to
+  the same state real usage would produce.
+- New idempotent, tenant-scoped reconciliation script,
+  `scripts/staging/backfill-achievements.ts`: re-evaluates achievements for
+  every learner with recorded activity in every tenant. Safe to re-run any
+  number of times — awards rely on `evaluateAchievements()`'s existing
+  `(userId, achievementId)` unique constraint, so reruns are no-ops.
+- Both scripts import `@/lib/prisma`/`@/lib/gamification/achievements`,
+  which transitively import `"server-only"` — that throws under plain
+  `tsx` unless resolved through its `react-server` export condition, so run
+  them with:
+  ```
+  npx tsx --conditions=react-server scripts/staging/seed-tenant-fixtures.ts
+  npx tsx --conditions=react-server scripts/staging/backfill-achievements.ts
+  ```
+  Both remain guarded by `scripts/staging/env.ts` (production ref
+  hard-blocked).
+
+**Test coverage:** `src/__tests__/integration/gamification-achievement-award.integration.test.ts`
+(new, real-DB, `describe.skipIf(!hasStagingDb)` — run via
+`TEST_DATABASE_URL=... npm test`) covers: awarding on already-met criteria,
+`getAchievementsPageData` reporting `earned: true`/non-grayscale and an
+incremented count, an unmet badge staying locked/grayscale with correct
+progress, no duplicate award on repeated evaluation, and tenant isolation
+(another tenant evaluating the same `userId` sees no progress and awards
+nothing).
+
+**Staging reconciliation (this pass):** ran
+`backfill-achievements.ts` against the Supabase STAGING project
+(`wxhesjgjlufjwwtahqsu`, guard-checked, production ref
+`peqzxcbtawpvijzllkdw` never touched) — awarded `first-quiz`,
+`perfect-score`, `high-achiever`, `first-attempt-ace` to the WisdomQuant
+fixture learner (verified via a read-only query: exactly 4
+`UserAchievement` rows, no duplicates). Re-ran a second time to confirm
+idempotency — zero new awards, zero errors. RLS was not touched by this
+pass and remains disabled, per the existing staging setup.
