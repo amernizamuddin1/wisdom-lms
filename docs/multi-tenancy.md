@@ -875,3 +875,54 @@ workaround left behind.
 
 No schema, migration, or scoping-logic changes in this pass — tooling only.
 Production was not touched; RLS remains disabled.
+
+## Supabase staging test auth accounts (2026-07-17)
+
+The Step 4.2 fixture `User` rows above were created directly in Postgres and
+had no matching `auth.users` row, so nobody could actually log in as them —
+`User.id` must equal the Supabase Auth user id (see `src/lib/auth.ts`).
+`scripts/staging/create-staging-auth-users.ts` (new) creates the missing Auth
+identities for browser-testing the `multi-tenancy-foundation` Vercel Preview
+deployment against staging (`wxhesjgjlufjwwtahqsu`). **Production
+(`peqzxcbtawpvijzllkdw`) was not touched. RLS remains disabled.**
+
+It reuses each fixture `User.id` as the Auth user id (via
+`AdminUserAttributes.id`, supported by `admin.auth.admin.createUser`) —
+zero new or rewritten DB rows, only new `auth.users` entries linked 1:1 to
+the existing fixture users by id. Idempotent: an already-existing Auth
+identity is left untouched (no password reset) on re-run.
+
+**Accounts (all `*.test` — IANA-reserved, non-routable):**
+
+| Role | Tenant | Email |
+|---|---|---|
+| Admin | WisdomQuant | `wisdomquant-fixture-admin@example.test` |
+| Learner | WisdomQuant | `wisdomquant-fixture-learner@example.test` |
+| Admin | Demo Academy | `demoacademy-admin@example.test` |
+| Learner | Demo Academy | `demoacademy-learner@example.test` |
+| Shared (cross-tenant: STUDENT in WisdomQuant, ADMIN in Demo Academy) | Both | `cross-tenant-user@example.test` |
+
+Temporary passwords are written only to the gitignored
+`.env.staging-test-accounts.local` (repo root, covered by the existing
+`.env*` `.gitignore` pattern) — never logged, never committed. Ask whoever
+ran the script for the file, or regenerate by re-running it (a no-op for
+accounts that already have an Auth identity).
+
+**Result (this pass): all 5 accounts created, all 5 verified.**
+`scripts/staging/verify-staging-auth-users.ts` (new) signs in as each
+account with the anon-key client, confirms the returned Auth user id matches
+the Prisma `User.id`, and confirms the `TenantMembership` set matches the
+Step 4.2 fixture shape. **ALL CHECKS PASSED.**
+
+Not covered by this pass (data/session layer only): the host-based tenant
+restriction (a WisdomQuant learner's session being denied on Demo Academy's
+subdomain, and vice versa, per `src/proxy.ts`'s host-based tenant
+resolution) needs a reachable preview URL for each tenant's host and should
+be spot-checked directly in the browser.
+
+**To run:**
+```
+npx tsx scripts/staging/create-staging-auth-users.ts
+npx tsx scripts/staging/verify-staging-auth-users.ts
+```
+Both are guarded by `scripts/staging/env.ts` (production ref hard-blocked).

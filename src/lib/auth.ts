@@ -21,19 +21,26 @@ async function getActiveMembership(userId: string) {
 // tenant (never from email) so the same login form works for every role and
 // every tenant, and a cross-tenant user lands on the right destination for
 // whichever tenant they signed in on.
-export async function resolvePostLoginPath(): Promise<string> {
+//
+// `loginPath` lets both the student (`/login`) and admin (`/admin/login`)
+// forms share this logic. Authentication succeeding with no membership in
+// the *active* tenant (e.g. a Demo Academy admin signing in on WisdomQuant's
+// host) is a distinct case from "not signed in at all" — it gets routed back
+// to the same login form with `?error=no_access` so the page can explain
+// why, instead of silently landing back on a blank login form.
+export async function resolvePostLoginPath(loginPath: string = "/login"): Promise<string> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return "/login";
+  if (!user) return loginPath;
 
   const profile = await prisma.user.findUnique({ where: { id: user.id } });
-  if (!profile) return "/login";
+  if (!profile) return loginPath;
 
   const membership = await getActiveMembership(profile.id);
-  if (!membership || membership.status !== "ACTIVE") return "/login";
+  if (!membership || membership.status !== "ACTIVE") return `${loginPath}?error=no_access`;
 
   return membership.role === "ADMIN" ? "/admin" : "/dashboard";
 }

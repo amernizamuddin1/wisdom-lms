@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -16,13 +16,19 @@ import AuthPageShell, {
   authLinkClassName,
 } from "@/components/AuthPageShell";
 
-export default function AdminLoginPage() {
+const NO_ACCESS_MESSAGE =
+  "Your account does not have access to this organisation. Please use the correct organisation login address.";
+
+function AdminLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const branding = useBranding();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    searchParams.get("error") === "no_access" ? NO_ACCESS_MESSAGE : null,
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -40,7 +46,7 @@ export default function AdminLoginPage() {
       return;
     }
 
-    router.push("/admin");
+    router.push("/admin/post-login");
     router.refresh();
   }
 
@@ -112,5 +118,13 @@ export default function AdminLoginPage() {
         </p>
       </form>
     </AuthPageShell>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminLoginForm />
+    </Suspense>
   );
 }

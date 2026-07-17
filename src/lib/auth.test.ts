@@ -193,10 +193,64 @@ describe("resolvePostLoginPath", () => {
     await expect(resolvePostLoginPath()).resolves.toBe("/login");
   });
 
-  it("sends a removed membership to /login rather than either dashboard", async () => {
+  it("sends a removed membership to /login?error=no_access, not either dashboard", async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
     mockUserFindUnique.mockResolvedValue(PROFILE);
     mockMembershipFindUnique.mockResolvedValue({ role: "ADMIN", status: "REMOVED" });
-    await expect(resolvePostLoginPath()).resolves.toBe("/login");
+    await expect(resolvePostLoginPath()).resolves.toBe("/login?error=no_access");
+  });
+
+  // Regression coverage for the Demo Academy / WisdomQuant cross-tenant
+  // login bug: authenticating successfully but having no membership in the
+  // *active* tenant (resolved from the request host) must surface a clear,
+  // distinguishable outcome instead of behaving like "not signed in" — and
+  // must respect the caller's own login form (student vs admin) rather than
+  // always bouncing to /login.
+  describe("cross-tenant no-membership case (Demo Academy / WisdomQuant regression)", () => {
+    it("Demo Academy admin authenticating on the WisdomQuant tenant context gets /login?error=no_access", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+      mockUserFindUnique.mockResolvedValue(PROFILE);
+      mockGetTenantId.mockResolvedValue(WISDOMQUANT_TENANT_ID);
+      mockMembershipFindUnique.mockResolvedValue(null); // no membership in WisdomQuant
+      await expect(resolvePostLoginPath()).resolves.toBe("/login?error=no_access");
+    });
+
+    it("WisdomQuant admin authenticating on the Demo Academy tenant context gets /admin/login?error=no_access", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+      mockUserFindUnique.mockResolvedValue(PROFILE);
+      mockGetTenantId.mockResolvedValue(DEMO_ACADEMY_TENANT_ID);
+      mockMembershipFindUnique.mockResolvedValue(null); // no membership in Demo Academy
+      await expect(resolvePostLoginPath("/admin/login")).resolves.toBe("/admin/login?error=no_access");
+    });
+
+    it("Demo Academy admin authenticating on the Demo Academy tenant context reaches /admin", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+      mockUserFindUnique.mockResolvedValue(PROFILE);
+      mockGetTenantId.mockResolvedValue(DEMO_ACADEMY_TENANT_ID);
+      mockMembershipFindUnique.mockResolvedValue({ role: "ADMIN", status: "ACTIVE" });
+      await expect(resolvePostLoginPath("/admin/login")).resolves.toBe("/admin");
+    });
+
+    it("Demo Academy learner authenticating on the Demo Academy tenant context reaches /dashboard", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+      mockUserFindUnique.mockResolvedValue(PROFILE);
+      mockGetTenantId.mockResolvedValue(DEMO_ACADEMY_TENANT_ID);
+      mockMembershipFindUnique.mockResolvedValue({ role: "STUDENT", status: "ACTIVE" });
+      await expect(resolvePostLoginPath()).resolves.toBe("/dashboard");
+    });
+
+    it("a shared cross-tenant user resolves according to the active tenant context, including the no-access case", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: PROFILE.id } } });
+      mockUserFindUnique.mockResolvedValue(PROFILE);
+
+      // Member of Demo Academy (as ADMIN) but not WisdomQuant at all.
+      mockGetTenantId.mockResolvedValueOnce(DEMO_ACADEMY_TENANT_ID);
+      mockMembershipFindUnique.mockResolvedValueOnce({ role: "ADMIN", status: "ACTIVE" });
+      await expect(resolvePostLoginPath("/admin/login")).resolves.toBe("/admin");
+
+      mockGetTenantId.mockResolvedValueOnce(WISDOMQUANT_TENANT_ID);
+      mockMembershipFindUnique.mockResolvedValueOnce(null);
+      await expect(resolvePostLoginPath()).resolves.toBe("/login?error=no_access");
+    });
   });
 });

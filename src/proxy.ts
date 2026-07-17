@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveTenantFromHost } from "@/lib/tenant-resolver";
+import { platformPrisma } from "@/lib/prisma";
 
 // Server-to-server endpoints (payment gateway webhooks, cron triggers) are
 // hit directly by Razorpay/Vercel Cron on whatever host the deployment is
@@ -77,9 +78,22 @@ export async function proxy(request: NextRequest) {
     }
 
     if (user && isLoginPage) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/admin";
-      return NextResponse.redirect(url);
+      // Only skip the login form for someone who actually has an ACTIVE
+      // ADMIN membership in *this* tenant. A session-only check here (as
+      // this used to be) unconditionally bounced any authenticated user to
+      // /admin regardless of tenant membership — for an admin of a
+      // *different* tenant that's an infinite loop back to /admin/login
+      // (via requireAdmin -> requireUser both failing), which is exactly
+      // what made a cross-tenant login look like a silent refresh instead
+      // of a clear error.
+      const membership = await platformPrisma.tenantMembership.findUnique({
+        where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } },
+      });
+      if (membership?.status === "ACTIVE" && membership.role === "ADMIN") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/admin";
+        return NextResponse.redirect(url);
+      }
     }
   }
 
