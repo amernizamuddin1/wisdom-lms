@@ -926,3 +926,103 @@ npx tsx scripts/staging/create-staging-auth-users.ts
 npx tsx scripts/staging/verify-staging-auth-users.ts
 ```
 Both are guarded by `scripts/staging/env.ts` (production ref hard-blocked).
+
+## Cross-tenant login bug: root cause, fix, and staging host verification (2026-07-17)
+
+Closes the gap flagged immediately above: the Preview deployment had no
+reachable per-tenant host, so a Demo Academy admin signing in on the
+generic Preview URL silently failed. **Production
+(`peqzxcbtawpvijzllkdw`) was not touched. RLS remains disabled.**
+
+**Root cause.** `ROOT_DOMAIN` was unset in the Preview environment, so
+`resolveTenantFromHost()` (`src/lib/tenant-resolver.ts`) fell through to its
+local-dev fallback (`DEFAULT_TENANT_SLUG=wisdomquant`) for *any* host,
+including the generic `*.vercel.app` Preview URL. A Demo Academy admin's
+Supabase sign-in succeeded, but the active tenant resolved to WisdomQuant,
+where they have no membership. Compounding this, `src/proxy.ts`'s
+`/admin/login` → `/admin` bounce checked only Supabase session presence, not
+tenant membership — so the failed cross-tenant login chained through
+`requireAdmin` → `/dashboard` → `requireUser` → `/login` and, on any retry,
+got bounced straight back to `/admin` before an error could render. From the
+user's side this looked like a silent refresh with no explanation.
+
+**Fix (code, `multi-tenancy-foundation`, commit `fd6d7bb`).**
+- `resolvePostLoginPath()` (`src/lib/auth.ts`) now takes a `loginPath` param
+  and returns `"<loginPath>?error=no_access"` when Supabase auth succeeds
+  but there's no `ACTIVE` membership in the active tenant — previously
+  indistinguishable from "not signed in".
+- New `src/app/admin/post-login/page.tsx` mirrors `/post-login` for the
+  admin form, so `src/app/admin/login/page.tsx` no longer hardcodes a
+  destination.
+- Both login pages read `?error=no_access` and show: "Your account does not
+  have access to this organisation. Please use the correct organisation
+  login address."
+- `src/proxy.ts`'s `/admin/login` → `/admin` bounce now checks a real
+  `ACTIVE`/`ADMIN` `TenantMembership` via `platformPrisma` instead of
+  session presence alone — this is what actually stops the loop, since it's
+  what used to overwrite the error page before it could render.
+- `scripts/staging/fix-tenant-subdomains.ts` (new, one-off, staging-only):
+  the seeded Demo Academy tenant's `subdomain` was `"demo-academy"`
+  (hyphenated) but the real DNS host is `demoacademy.staging.wisdomquant.com`
+  (no hyphen) — fixed the DB value to match. Idempotent, safe to re-run.
+
+**Staging host setup.**
+- Custom domains `wisdomquant.staging.wisdomquant.com` and
+  `demoacademy.staging.wisdomquant.com` added in Vercel and pointed at the
+  `wisdom-lms` project (DNS + Vercel domain verification done outside this
+  tooling).
+- `ROOT_DOMAIN=staging.wisdomquant.com` set on the Preview environment via
+  `vercel env add` — the subdomain half of `resolveTenantFromHost()`
+  (`<subdomain>.<ROOT_DOMAIN>`) now actually activates for staging, rather
+  than every host falling through to the `DEFAULT_TENANT_SLUG` dev fallback.
+  `wisdomquant`/`demoacademy` tenant `subdomain` values now match the real
+  hosts exactly (see fix above).
+- The project has Vercel Deployment Protection (Vercel Authentication)
+  enabled, which gates all Preview URLs — including custom domains aliased
+  to a Preview deployment — behind a Vercel account login. "Protection
+  Bypass for Automation" was enabled
+  (`vercel project protection enable wisdom-lms --protection-bypass`) to
+  generate a bypass secret for scripted/browser verification; the secret
+  itself was retrieved from the dashboard (not exposed via the CLI) and used
+  as a one-time `?x-vercel-protection-bypass=...&x-vercel-set-bypass-cookie=true`
+  query param to set a bypass cookie for the verification browser session.
+  This only allows bypassing the auth wall with the secret in hand — it does
+  not make Preview publicly reachable.
+
+**Live verification, staging Preview deployment (commit `fd6d7bb`), all
+PASSED:**
+- `wisdomquant.staging.wisdomquant.com` and `demoacademy.staging.wisdomquant.com`
+  each render their own tenant's branding (confirms tenant resolution is
+  host-only, no query-param override anywhere).
+- WisdomQuant admin (`wisdomquant-fixture-admin@example.test`) signs in on
+  the WisdomQuant host → reaches `/admin`.
+- WisdomQuant learner (`wisdomquant-fixture-learner@example.test`)
+  authenticates on the Demo Academy host → rejected with the exact
+  "no access" message, no redirect loop.
+- Demo Academy admin (`demoacademy-admin@example.test`) signs in on the
+  Demo Academy host → reaches `/admin` (this is the exact original bug
+  scenario, now fixed).
+- Demo Academy learner (`demoacademy-learner@example.test`)
+  authenticates on the WisdomQuant host → rejected with the same message;
+  on their own host → reaches `/dashboard`.
+- Cross-tenant user (`cross-tenant-user@example.test`, STUDENT in
+  WisdomQuant / ADMIN in Demo Academy) → `/dashboard` on the WisdomQuant
+  host, `/admin` on the Demo Academy host — resolved purely by the active
+  tenant's `TenantMembership`, matching neither role nor email.
+
+**Test coverage.** No Playwright/e2e framework exists in this repo (see
+"Tests / test framework" above) — new coverage was added at the same layer
+as the rest of this suite: 5 new cases in `src/lib/auth.test.ts` under
+"cross-tenant no-membership case (Demo Academy / WisdomQuant regression)",
+covering the same 5 scenarios listed above via `resolvePostLoginPath()`
+directly (mocked Supabase/Prisma, no network). Full unit suite: 107 passed,
+54 skipped (unchanged skip count — no `TEST_DATABASE_URL` in this pass).
+`npx tsc --noEmit` and `npx eslint` both clean on changed files.
+
+**Not done in this pass:** `requireAdmin`/`requireUser` (the page-level
+guards, as opposed to `resolvePostLoginPath`) were not changed — their
+existing behavior (redirect a non-admin away from `/admin` to `/dashboard`,
+non-member away from any gated page to `/login`) was already correct and
+tenant-safe; only the *first* redirect after login lacked a clear message.
+Deployment Protection was left enabled (only the automation-bypass secret
+was added) — Preview is not publicly reachable as a result of this pass.
