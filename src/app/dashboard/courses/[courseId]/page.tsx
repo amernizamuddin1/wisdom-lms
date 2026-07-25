@@ -235,7 +235,7 @@ export default async function CourseViewPage({
                   <Button asChild size="lg" className="min-h-11">
                     <Link href={`/dashboard/courses/${courseId}/discussion`}>
                       <MessageSquareIcon />
-                      Question Board
+                      Discussion Board
                     </Link>
                   </Button>
                 </div>
