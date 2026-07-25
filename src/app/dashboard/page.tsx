@@ -132,8 +132,8 @@ export default async function MyCoursesPage({
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {pagedEnrollments.map((enrollment) => {
+          <div className="grid grid-cols-1 justify-start gap-5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(320px,420px))]">
+            {pagedEnrollments.map((enrollment, index) => {
               const course = enrollment.course;
               const lessonIds = course.chapters.flatMap((c) =>
                 c.lessons.map((l) => l.id),
@@ -167,9 +167,10 @@ export default async function MyCoursesPage({
                         src={course.thumbnailUrl}
                         alt={course.title}
                         fill
-                        sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
+                        sizes="(min-width: 1024px) 420px, (min-width: 768px) calc((100vw - 140px) / 2), (min-width: 640px) calc((100vw - 68px) / 2), calc(100vw - 48px)"
                         className="object-contain transition-transform duration-[350ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] motion-safe:group-hover:scale-[1.04]"
-                        unoptimized
+                        preload={index === 0}
+                        fetchPriority={index === 0 ? "high" : undefined}
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
