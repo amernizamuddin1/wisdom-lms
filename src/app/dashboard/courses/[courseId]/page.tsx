@@ -144,7 +144,7 @@ export default async function CourseViewPage({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Course Content
             </p>
-            <h2 className="break-words text-lg font-semibold leading-snug text-foreground">
+            <h2 className="break-words text-lg font-semibold leading-snug text-primary">
               {course.title}
             </h2>
           </div>
