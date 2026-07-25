@@ -19,7 +19,6 @@ export default function MobileCourseDrawer({
   activeLessonId,
   completedLessonIds,
   passedQuizIds,
-  activePanel,
 }: {
   courseId: string;
   courseTitle: string;
@@ -29,7 +28,6 @@ export default function MobileCourseDrawer({
   activeLessonId: string | null;
   completedLessonIds: string[];
   passedQuizIds: string[];
-  activePanel?: "discussion";
 }) {
   const [open, setOpen] = useState(false);
 
@@ -61,7 +59,6 @@ export default function MobileCourseDrawer({
               activeLessonId={activeLessonId}
               completedLessonIds={completedLessonIds}
               passedQuizIds={passedQuizIds}
-              activePanel={activePanel}
               onNavigate={() => setOpen(false)}
             />
           </div>

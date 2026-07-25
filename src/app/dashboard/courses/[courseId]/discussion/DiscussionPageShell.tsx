@@ -15,7 +15,7 @@ export default function DiscussionPageShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-6">
+    <div className="lg:grid lg:grid-cols-[360px_1fr] lg:items-start lg:gap-6">
       <div className="mb-4 lg:hidden">
         <MobileCourseDrawer
           courseId={courseId}
@@ -26,24 +26,26 @@ export default function DiscussionPageShell({
           activeLessonId={null}
           completedLessonIds={shell.completedLessonIds}
           passedQuizIds={shell.passedQuizIds}
-          activePanel="discussion"
         />
       </div>
 
-      <aside className="hidden space-y-4 lg:block">
-        <h2 className="text-lg font-semibold text-foreground">{shell.course.title}</h2>
-        <CourseSidebarNav
-          courseId={courseId}
-          chapters={shell.sidebarChapters}
-          courseQuizzes={shell.sidebarCourseQuizzes}
-          activeLessonId={null}
-          completedLessonIds={shell.completedLessonIds}
-          passedQuizIds={shell.passedQuizIds}
-          activePanel="discussion"
-        />
+      <aside className="hidden lg:block">
+        <div className="sticky top-6 max-h-[calc(100vh-3rem)] space-y-4 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-card">
+          <h2 className="break-words text-lg font-semibold leading-snug text-foreground">
+            {shell.course.title}
+          </h2>
+          <CourseSidebarNav
+            courseId={courseId}
+            chapters={shell.sidebarChapters}
+            courseQuizzes={shell.sidebarCourseQuizzes}
+            activeLessonId={null}
+            completedLessonIds={shell.completedLessonIds}
+            passedQuizIds={shell.passedQuizIds}
+          />
+        </div>
       </aside>
 
-      <section className="space-y-4">{children}</section>
+      <section className="min-w-0 space-y-4">{children}</section>
     </div>
   );
 }

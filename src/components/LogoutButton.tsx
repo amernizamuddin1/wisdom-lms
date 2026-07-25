@@ -5,18 +5,22 @@ import { LogOutIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 
-export default function LogoutButton() {
+export function useLogout() {
   const router = useRouter();
 
-  async function handleLogout() {
+  return async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
-  }
+  };
+}
+
+export default function LogoutButton() {
+  const handleLogout = useLogout();
 
   return (
-    <SidebarMenuButton onClick={handleLogout}>
+    <SidebarMenuButton onClick={handleLogout} tooltip="Log out">
       <LogOutIcon />
       <span>Log out</span>
     </SidebarMenuButton>

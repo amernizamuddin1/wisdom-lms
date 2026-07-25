@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2Icon, CircleIcon, HelpCircleIcon, MessageSquareIcon } from "lucide-react";
+import { HelpCircleIcon, PlayCircleIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -16,7 +16,6 @@ export default function CourseSidebarNav({
   activeLessonId,
   completedLessonIds,
   passedQuizIds,
-  activePanel,
   onNavigate,
 }: {
   courseId: string;
@@ -25,96 +24,101 @@ export default function CourseSidebarNav({
   activeLessonId: string | null;
   completedLessonIds: string[];
   passedQuizIds: string[];
-  /** Highlights a non-lesson nav entry (e.g. the discussion tab) as active. */
-  activePanel?: "discussion";
   onNavigate?: () => void;
 }) {
   const completedSet = new Set(completedLessonIds);
   const passedSet = new Set(passedQuizIds);
 
   return (
-    <div className="space-y-4">
-      <Link
-        href={`/dashboard/courses/${courseId}/discussion`}
-        onClick={onNavigate}
-        className={cn(
-          "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
-          activePanel === "discussion"
-            ? "bg-primary text-primary-foreground"
-            : "text-foreground hover:bg-muted",
-        )}
-      >
-        <MessageSquareIcon className="size-4 shrink-0" />
-        Discussion
-      </Link>
-
-      {chapters.map((chapter) => (
-        <div key={chapter.id} className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">{chapter.title}</p>
-          <ul className="space-y-1">
-            {chapter.lessons.map((lesson) => {
-              const isDone = completedSet.has(lesson.id);
-              const isActive = activeLessonId === lesson.id;
-              return (
-                <li key={lesson.id}>
-                  <Link
-                    href={`/dashboard/courses/${courseId}?lesson=${lesson.id}`}
-                    onClick={onNavigate}
-                    className={cn(
-                      "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-foreground hover:bg-muted",
-                    )}
-                  >
-                    {isDone ? (
-                      <CheckCircle2Icon className="size-4 shrink-0 text-success" />
-                    ) : (
-                      <CircleIcon
+    <div className="space-y-5">
+      {chapters.map((chapter, index) => {
+        const chapterLessonCount = chapter.lessons.length;
+        const chapterCompletedCount = chapter.lessons.filter((l) => completedSet.has(l.id)).length;
+        return (
+          <div
+            key={chapter.id}
+            className={cn("space-y-1.5", index > 0 && "border-t border-border-subtle pt-4")}
+          >
+            <div className="flex items-baseline justify-between gap-2 px-2">
+              <p className="line-clamp-2 text-xs font-semibold text-foreground" title={chapter.title}>
+                {chapter.title}
+              </p>
+              {chapterLessonCount > 0 && (
+                <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                  {chapterCompletedCount}/{chapterLessonCount}
+                </span>
+              )}
+            </div>
+            <ul className="space-y-1">
+              {chapter.lessons.map((lesson) => {
+                const isDone = completedSet.has(lesson.id);
+                const isActive = activeLessonId === lesson.id;
+                return (
+                  <li key={lesson.id}>
+                    <Link
+                      href={`/dashboard/courses/${courseId}?lesson=${lesson.id}`}
+                      onClick={onNavigate}
+                      title={lesson.title}
+                      className={cn(
+                        "flex items-start gap-2 rounded-lg px-2.5 py-2.5 text-xs transition-colors",
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground hover:bg-muted",
+                      )}
+                    >
+                      <PlayCircleIcon
                         className={cn(
-                          "size-4 shrink-0",
-                          isActive ? "text-primary-foreground/70" : "text-muted-foreground",
+                          "mt-0.5 size-4 shrink-0",
+                          isActive ? "text-primary-foreground" : isDone ? "text-success" : "text-primary",
                         )}
                       />
-                    )}
-                    <span className="truncate">{lesson.title}</span>
+                      <span className="line-clamp-2 min-w-0 flex-1 break-words leading-snug">
+                        {lesson.title}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+              {chapter.quizzes.map((quiz) => (
+                <li key={quiz.id}>
+                  <Link
+                    href={`/quiz/${quiz.id}`}
+                    onClick={onNavigate}
+                    title={quiz.title}
+                    className="flex items-start gap-2 rounded-lg px-2.5 py-2.5 text-xs text-foreground hover:bg-muted"
+                  >
+                    <HelpCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <span className="line-clamp-2 min-w-0 flex-1 break-words leading-snug">
+                      {quiz.title}
+                    </span>
+                    <Badge variant={passedSet.has(quiz.id) ? "success" : "secondary"} className="shrink-0">
+                      {passedSet.has(quiz.id) ? "Passed" : "Quiz"}
+                    </Badge>
                   </Link>
                 </li>
-              );
-            })}
-            {chapter.quizzes.map((quiz) => (
-              <li key={quiz.id}>
-                <Link
-                  href={`/quiz/${quiz.id}`}
-                  onClick={onNavigate}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted"
-                >
-                  <HelpCircleIcon className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 truncate">{quiz.title}</span>
-                  <Badge variant={passedSet.has(quiz.id) ? "success" : "secondary"}>
-                    {passedSet.has(quiz.id) ? "Passed" : "Quiz"}
-                  </Badge>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+              ))}
+            </ul>
+          </div>
+        );
+      })}
 
       {courseQuizzes.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">Course Quizzes</p>
+        <div className={cn("space-y-1.5", chapters.length > 0 && "border-t border-border-subtle pt-4")}>
+          <p className="px-2 text-xs font-semibold text-foreground">Course Quizzes</p>
           <ul className="space-y-1">
             {courseQuizzes.map((quiz) => (
               <li key={quiz.id}>
                 <Link
                   href={`/quiz/${quiz.id}`}
                   onClick={onNavigate}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted"
+                  title={quiz.title}
+                  className="flex items-start gap-2 rounded-lg px-2.5 py-2.5 text-xs text-foreground hover:bg-muted"
                 >
-                  <HelpCircleIcon className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 truncate">{quiz.title}</span>
-                  <Badge variant={passedSet.has(quiz.id) ? "success" : "secondary"}>
+                  <HelpCircleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <span className="line-clamp-2 min-w-0 flex-1 break-words leading-snug">
+                    {quiz.title}
+                  </span>
+                  <Badge variant={passedSet.has(quiz.id) ? "success" : "secondary"} className="shrink-0">
                     {passedSet.has(quiz.id) ? "Passed" : "Quiz"}
                   </Badge>
                 </Link>
