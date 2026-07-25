@@ -7,32 +7,32 @@ const FOCUS_RING =
   "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 const cardVariants = cva(
-  "rounded-xl border bg-card text-card-foreground transition-[transform,box-shadow,border-color,background-color] duration-[240ms] ease-out [transform-origin:center]",
+  "rounded-xl border border-card-border bg-card text-card-foreground transition-[transform,box-shadow,border-color,background-color] duration-[240ms] ease-out [transform-origin:center]",
   {
     variants: {
       variant: {
-        default: "shadow-sm",
+        default: "shadow-card",
         kpi: cn(
-          "shadow-sm hover:border-indigo/30 hover:bg-indigo/[4%] motion-safe:hover:-translate-y-[5px]",
+          "shadow-card hover:border-indigo/30 hover:bg-indigo/[4%] motion-safe:hover:-translate-y-[5px]",
           "odd:motion-safe:hover:rotate-[-0.4deg] even:motion-safe:hover:rotate-[0.4deg]",
           "hover:shadow-[0_16px_32px_-12px_color-mix(in_oklab,var(--color-indigo)_28%,transparent)]",
           "dark:hover:bg-indigo/10 dark:hover:shadow-[0_16px_32px_-12px_color-mix(in_oklab,var(--color-indigo)_45%,transparent)]",
           FOCUS_RING,
         ),
         course: cn(
-          "shadow-sm hover:border-indigo/30 motion-safe:hover:-translate-y-[6px]",
+          "shadow-card hover:border-indigo/30 motion-safe:hover:-translate-y-[6px]",
           "odd:motion-safe:hover:rotate-[-0.5deg] even:motion-safe:hover:rotate-[0.5deg]",
           "hover:shadow-[0_16px_32px_-12px_color-mix(in_oklab,var(--color-indigo)_28%,transparent)]",
           "dark:hover:shadow-[0_16px_32px_-12px_color-mix(in_oklab,var(--color-indigo)_45%,transparent)]",
           FOCUS_RING,
         ),
         interactive: cn(
-          "shadow-sm hover:border-indigo/30 hover:bg-indigo/[4%] hover:shadow-md motion-safe:hover:-translate-y-1",
+          "shadow-card hover:border-indigo/30 hover:bg-indigo/[4%] hover:shadow-md motion-safe:hover:-translate-y-1",
           "dark:hover:bg-indigo/10",
           FOCUS_RING,
         ),
         subtle: cn(
-          "shadow-sm hover:border-border-strong hover:bg-muted/20 hover:shadow-md motion-safe:hover:-translate-y-0.5",
+          "shadow-card hover:border-border-strong hover:bg-muted/20 hover:shadow-md motion-safe:hover:-translate-y-0.5",
           FOCUS_RING,
         ),
       },

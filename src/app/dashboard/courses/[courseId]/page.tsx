@@ -139,7 +139,7 @@ export default async function CourseViewPage({
       </div>
 
       <aside className="hidden lg:block">
-        <div className="sticky top-6 max-h-[calc(100vh-3rem)] space-y-4 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-card">
+        <div className="sticky top-6 max-h-[calc(100vh-3rem)] space-y-4 overflow-y-auto rounded-xl border border-card-border bg-card p-4 shadow-card">
           <div className="space-y-1 px-1">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Course Content
@@ -164,7 +164,7 @@ export default async function CourseViewPage({
           {!activeLesson ? (
             <p className="text-muted-foreground">This course has no lessons yet.</p>
           ) : (
-            <div className="space-y-4 rounded-xl border border-border bg-card p-6 text-card-foreground shadow-card">
+            <div className="space-y-4 rounded-xl border border-card-border bg-card p-6 text-card-foreground shadow-card">
               <LessonTimeTracker
                 courseId={courseId}
                 lessonId={activeLesson.id}

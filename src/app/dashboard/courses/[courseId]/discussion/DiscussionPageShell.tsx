@@ -30,7 +30,7 @@ export default function DiscussionPageShell({
       </div>
 
       <aside className="hidden lg:block">
-        <div className="sticky top-6 max-h-[calc(100vh-3rem)] space-y-4 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-card">
+        <div className="sticky top-6 max-h-[calc(100vh-3rem)] space-y-4 overflow-y-auto rounded-xl border border-card-border bg-card p-4 shadow-card">
           <h2 className="break-words text-lg font-semibold leading-snug text-primary">
             {shell.course.title}
           </h2>

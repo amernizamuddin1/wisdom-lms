@@ -51,6 +51,7 @@
   --border: #e2e4e9;
   --border-strong: #d2d5dc;
   --border-subtle: #eceef2;
+  --card-border: var(--border);
   --input: #dfe2e7;
   --ring: #7c5cfc;
 
@@ -64,6 +65,30 @@
   --sidebar-ring: #7c5cfc;
 
   --radius: 0.75rem;
+  --card-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --header-height: 4rem;
+  --content-width: 72rem;
+
+  /* Auth shell (login/register/forgot/reset) — see AuthPageShell.tsx.
+     Defaults match the shell's original hardcoded violet values exactly,
+     so tokenizing it doesn't change any tenant's appearance by default;
+     only a tenant theme override (see src/lib/tenant-theme.ts) changes it. */
+  --auth-accent: #7c3aed;
+  --auth-focus-color: #7c3aed;
+  --auth-focus-ring: rgba(124, 58, 237, 0.15);
+  --auth-focus-ring-strong: rgba(124, 58, 237, 0.35);
+  --auth-button-bg: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 50%, #6366f1 100%);
+  --auth-button-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);
+  --auth-button-shadow-hover: 0 6px 18px rgba(124, 58, 237, 0.38);
+  --auth-icon-color: #7c3aed;
+  --auth-icon-border: rgba(124, 58, 237, 0.15);
+  --auth-icon-border-dark: rgba(124, 58, 237, 0.25);
+  --auth-icon-glow-dark: rgba(124, 58, 237, 0.15);
+  --auth-link-color: #7c3aed;
+  --auth-link-hover: #6d28d9;
+  --auth-link-color-dark: #a78bfa;
+  --auth-link-hover-dark: #c4b5fd;
+  --auth-glow-rgb: 124, 58, 237;
 }
 
 .dark {
@@ -116,6 +141,7 @@
   --border: #2c2f38;
   --border-strong: #3a3d48;
   --border-subtle: #252730;
+  --card-border: var(--border);
   --input: #343741;
   --ring: #8068ff;
 
@@ -127,6 +153,8 @@
   --sidebar-accent-foreground: #b6a6ff;
   --sidebar-border: #2c2f38;
   --sidebar-ring: #8068ff;
+
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4);
 }
 
 @theme inline {
@@ -176,6 +204,7 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-border-subtle: var(--border-subtle);
+  --color-card-border: var(--card-border);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
@@ -195,6 +224,8 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-card: var(--card-shadow);
 }
 
 @layer base {
