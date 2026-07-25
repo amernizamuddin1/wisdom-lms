@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
@@ -9,12 +10,17 @@ import type { User } from "@/generated/prisma/client";
 // the tenant-scoped membership — not the legacy global User.role — is now
 // the source of truth for "is this person an admin here". User.role is left
 // in place as a deprecated fallback field only (not read by these helpers).
-async function getActiveMembership(userId: string) {
+//
+// Wrapped in React's `cache()` because layouts and pages in the same request
+// routinely both need the caller's membership (e.g. dashboard layout + page
+// each resolving the current user) — this dedupes the Supabase Auth call and
+// the two Prisma lookups to once per request instead of once per caller.
+const getActiveMembership = cache(async function getActiveMembership(userId: string) {
   const tenantId = await getTenantId();
   return prisma.tenantMembership.findUnique({
     where: { tenantId_userId: { tenantId, userId } },
   });
-}
+});
 
 // Called right after a successful Supabase sign-in to decide where to send
 // the browser. Resolves purely from TenantMembership.role in the active
@@ -45,7 +51,10 @@ export async function resolvePostLoginPath(loginPath: string = "/login"): Promis
   return membership.role === "ADMIN" ? "/admin" : "/dashboard";
 }
 
-export async function requireAdmin(): Promise<User> {
+// Each of these is called from both a layout and a page (or several actions)
+// within the same request in normal usage — cache() dedupes the Supabase Auth
+// call and the two Prisma lookups to once per request instead of once per caller.
+export const requireAdmin = cache(async function requireAdmin(): Promise<User> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -71,9 +80,9 @@ export async function requireAdmin(): Promise<User> {
   }
 
   return profile;
-}
+});
 
-export async function requireUser(): Promise<User> {
+export const requireUser = cache(async function requireUser(): Promise<User> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -96,11 +105,11 @@ export async function requireUser(): Promise<User> {
   }
 
   return profile;
-}
+});
 
 // Non-redirecting lookup for public pages that render differently for signed-in
 // vs. anonymous visitors (e.g. Enroll vs. Go to Course) instead of gating access.
-export async function getOptionalUser(): Promise<User | null> {
+export const getOptionalUser = cache(async function getOptionalUser(): Promise<User | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -115,4 +124,4 @@ export async function getOptionalUser(): Promise<User | null> {
   if (!membership || membership.status !== "ACTIVE") return null;
 
   return profile;
-}
+});
