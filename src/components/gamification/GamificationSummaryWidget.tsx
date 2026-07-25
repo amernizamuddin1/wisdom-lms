@@ -59,7 +59,7 @@ export default async function GamificationSummaryWidget({ userId }: { userId: st
 
         <div className="flex items-center gap-3">
           <p className="max-w-xs text-sm text-muted-foreground">{nextMilestone}</p>
-          <Button asChild size="sm" variant="outline">
+          <Button asChild size="sm" variant="default">
             <Link href="/dashboard/analytics">View Analytics</Link>
           </Button>
         </div>

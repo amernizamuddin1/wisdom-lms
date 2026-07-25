@@ -61,7 +61,7 @@ export default function CatalogFilters({
           </SelectContent>
         </Select>
       )}
-      <Button type="submit" variant="outline">
+      <Button type="submit" variant="default">
         Search
       </Button>
       {hasActiveFilters && (
