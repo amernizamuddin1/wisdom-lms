@@ -6,6 +6,7 @@ import { useRef } from "react";
 import {
   AwardIcon,
   BarChart3Icon,
+  CompassIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -38,6 +39,7 @@ import LogoutButton, { useLogout } from "@/components/LogoutButton";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "My Courses", icon: LayoutDashboardIcon, exact: true },
+  { href: "/courses", label: "Course Catalog", icon: CompassIcon, exact: false },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3Icon, exact: false },
   { href: "/dashboard/achievements", label: "Achievements", icon: TrophyIcon, exact: false },
   { href: "/dashboard/orders", label: "Order History", icon: ReceiptIcon, exact: false },
