@@ -1,13 +1,24 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Poppins } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import AppToaster from "@/components/AppToaster";
 import { BrandingProvider } from "@/components/BrandingProvider";
 import { getBranding } from "@/lib/branding";
+import { getOptionalTenantContext } from "@/lib/tenant-context";
+import { WISDOMQUANT_TENANT_SLUG, wisdomQuantThemeCss } from "@/lib/tenant-theme";
 import "./globals.css";
 
 const inter = Inter({
   variable: "--font-inter",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+// Only loaded/served for the WisdomQuant tenant (see wisdomQuantThemeCss
+// below, which points --font-sans at this variable) — every other tenant
+// keeps Inter as --font-sans.
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
@@ -26,12 +37,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const branding = await getBranding();
+  const [branding, tenant] = await Promise.all([getBranding(), getOptionalTenantContext()]);
+  const isWisdomQuant = tenant?.tenantSlug === WISDOMQUANT_TENANT_SLUG;
 
   return (
     <html
       lang="en"
-      className={`${inter.variable} h-full antialiased`}
+      className={`${inter.variable} ${poppins.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
@@ -48,6 +60,7 @@ export default async function RootLayout({
             --indigo: ${branding.darkPrimaryColor};
             --sidebar-primary: ${branding.darkPrimaryColor};
           }
+          ${isWisdomQuant ? wisdomQuantThemeCss : ""}
         `}</style>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <BrandingProvider branding={branding}>
