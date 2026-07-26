@@ -29,7 +29,7 @@ export default function BadgeCard({ card }: { card: AchievementCardData }) {
       className={cn(
         "flex flex-col items-center gap-2 p-4 text-center",
         cardVariants({ variant: "subtle" }),
-        !card.earned && "bg-muted/30",
+        !card.earned && "dark:bg-muted/30",
       )}
     >
       <BadgeImage
