@@ -240,6 +240,14 @@ body {
   color: var(--color-foreground);
 }
 
+/* Light-mode cards always remain white, including branded tenant hover
+   states. Keeping this unlayered gives the shared surface contract precedence
+   over variant utilities without affecting dark mode. */
+:root:not(.dark) [data-slot="card"],
+:root:not(.dark) [data-slot="card"]:hover {
+  background-color: #ffffff;
+}
+
 /* Login page decorative background — slow drifting blurred gradient forms.
    Scoped to these class names only; inert (no animation) whenever the user
    prefers reduced motion, since motion-safe: only applies the animate-*
