@@ -440,6 +440,7 @@ model Course {
   instructors       CourseInstructor[]
 
   @@index([tenantId])
+  @@index([tenantId, status, createdAt])
   @@map("courses")
 }
 
@@ -677,6 +678,7 @@ model Enrollment {
   @@index([tenantId, enrolledAt])
   @@index([tenantId, status])
   @@index([tenantId, courseId, status])
+  @@index([tenantId, userId, status, enrolledAt])
   @@map("enrollments")
 }
 
@@ -804,6 +806,7 @@ model CourseBundle {
   couponBundles      CouponBundle[]
 
   @@index([tenantId])
+  @@index([tenantId, status, createdAt])
   @@map("course_bundles")
 }
 
@@ -1309,6 +1312,7 @@ model NotificationRecipient {
 
   @@unique([notificationId, userId])
   @@index([tenantId])
+  @@index([tenantId, userId, readAt, deliveredAt])
   @@map("notification_recipients")
 }
 
@@ -1528,6 +1532,7 @@ model UserAchievement {
 
   @@unique([userId, achievementId])
   @@index([tenantId])
+  @@index([tenantId, userId, earnedAt])
   @@map("user_achievements")
 }
 

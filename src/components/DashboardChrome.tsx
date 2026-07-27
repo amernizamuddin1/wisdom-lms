@@ -6,21 +6,17 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import StudentSidebar from "@/components/StudentSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
-import NotificationBell from "@/components/NotificationBell";
 import UnlockWatcher from "@/components/gamification/UnlockWatcher";
-import type { getNotificationsForUser } from "@/lib/communications/notifications";
 
 export default function DashboardChrome({
   userEmail,
   platformName,
-  notifications,
-  unreadCount,
+  notificationBell,
   children,
 }: {
   userEmail: string;
   platformName: string;
-  notifications: Awaited<ReturnType<typeof getNotificationsForUser>>;
-  unreadCount: number;
+  notificationBell: React.ReactNode;
   children: React.ReactNode;
 }) {
   // The global rail stays permanently collapsed to an icon strip (per design:
@@ -51,7 +47,7 @@ export default function DashboardChrome({
             <span className="text-sm font-medium text-foreground">{platformName}</span>
           </div>
           <div className="flex items-center gap-2">
-            <NotificationBell notifications={notifications} unreadCount={unreadCount} />
+            {notificationBell}
             <ThemeToggle />
           </div>
         </header>

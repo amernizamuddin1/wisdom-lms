@@ -6,6 +6,8 @@ import { requireAdmin } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant-context";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { invalidatePublicBundleCache } from "@/lib/public-cache";
+import { COURSE_ASSETS_BUCKET, buildBundleThumbnailPath, describeStorageError, validateUpload } from "@/lib/storage/paths";
 import { parseDecimal, splitCommaList, parseDate, parseDiscountFields } from "@/lib/form-parsing";
 import type { DurationChoice } from "@/lib/access";
 import { grantBundleAccess, backfillNewBundleCourse } from "@/lib/bundle-access";
@@ -82,6 +84,7 @@ export async function createBundle(
     throw e;
   }
 
+  await invalidatePublicBundleCache();
   redirect(`/admin/bundles/${bundle.id}`);
 }
 
@@ -166,6 +169,7 @@ export async function upsertBundlePrices(
     await prisma.bundlePrice.deleteMany({ where: { bundleId, currency: "EUR" } });
   }
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return { success: true };
 }
@@ -202,6 +206,7 @@ export async function updateBundleAccessPolicy(
     });
   }
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return { success: true };
 }
@@ -220,6 +225,7 @@ export async function setBundleStatus(
   }
 
   await prisma.courseBundle.update({ where: { id: bundleId }, data: { status } });
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   revalidatePath("/admin/bundles");
   return {};
@@ -236,6 +242,7 @@ export async function deleteBundle(bundleId: string): Promise<{ error?: string }
   }
 
   await prisma.courseBundle.delete({ where: { id: bundleId } });
+  await invalidatePublicBundleCache();
   revalidatePath("/admin/bundles");
   redirect("/admin/bundles");
 }
@@ -264,6 +271,7 @@ export async function addCourseToBundle(
     await backfillNewBundleCourse(tx, { bundleId, courseId });
   });
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return {};
 }
@@ -288,6 +296,7 @@ export async function removeCourseFromBundle(
     where: { bundleId_courseId: { bundleId, courseId } },
   });
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return {};
 }
@@ -322,6 +331,7 @@ export async function assignBundleToLearner(
     await grantBundleAccess(tx, { userId: user.id, bundleId, startAt });
   });
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return { success: true };
 }
@@ -332,31 +342,44 @@ export async function uploadBundleThumbnail(
   formData: FormData,
 ): Promise<ActionState> {
   await requireAdmin();
+  const tenantId = await getTenantId();
+
+  try {
+    await prisma.courseBundle.findUniqueOrThrow({ where: { id: bundleId } });
+  } catch {
+    return { error: "Bundle not found." };
+  }
 
   const file = formData.get("thumbnail");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Choose an image file." };
   }
 
+  const validation = validateUpload(file, { allowedPrefix: "image/", maxBytes: 5 * 1024 * 1024 });
+  if (!validation.ok) {
+    return { error: validation.error };
+  }
+
   const supabase = createAdminClient();
   const ext = file.name.split(".").pop() || "jpg";
-  const path = `bundles/${bundleId}/thumbnail-${Date.now()}.${ext}`;
+  const path = buildBundleThumbnailPath(tenantId, bundleId, ext);
 
   const { error: uploadError } = await supabase.storage
-    .from("course-assets")
+    .from(COURSE_ASSETS_BUCKET)
     .upload(path, file, { upsert: true, contentType: file.type });
 
   if (uploadError) {
-    return { error: `Upload failed: ${uploadError.message}` };
+    return { error: describeStorageError(uploadError) };
   }
 
-  const { data } = supabase.storage.from("course-assets").getPublicUrl(path);
+  const { data } = supabase.storage.from(COURSE_ASSETS_BUCKET).getPublicUrl(path);
 
   await prisma.courseBundle.update({
     where: { id: bundleId },
     data: { thumbnailUrl: data.publicUrl },
   });
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return { success: true };
 }

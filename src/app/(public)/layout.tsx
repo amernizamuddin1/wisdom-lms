@@ -1,32 +1,29 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { GraduationCapIcon, ShoppingCartIcon } from "lucide-react";
-import { getOptionalUser } from "@/lib/auth";
+import { GraduationCapIcon } from "lucide-react";
 import { getBranding } from "@/lib/branding";
-import { getCartItemCount } from "@/lib/cart";
-import { getNotificationsForUser, getUnreadNotificationCount } from "@/lib/communications/notifications";
-import { Button } from "@/components/ui/button";
+import { getOptionalTenantContext } from "@/lib/tenant-context";
+import { WISDOMQUANT_SITE_URL, WISDOMQUANT_TENANT_SLUG } from "@/lib/tenant-theme";
 import ThemeToggle from "@/components/ThemeToggle";
-import NotificationBell from "@/components/NotificationBell";
+import {
+  default as PublicUserControls,
+  PublicUserControlsFallback,
+} from "@/components/PublicUserControls";
+import PublicMobileNav from "./PublicMobileNav";
 
 export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [user, branding] = await Promise.all([getOptionalUser(), getBranding()]);
-  const [cartItemCount, notifications, unreadCount] = user
-    ? await Promise.all([
-        getCartItemCount(user.id),
-        getNotificationsForUser(user.id),
-        getUnreadNotificationCount(user.id),
-      ])
-    : [0, [], 0];
+  const [branding, tenant] = await Promise.all([getBranding(), getOptionalTenantContext()]);
+  const isWisdomQuant = tenant?.tenantSlug === WISDOMQUANT_TENANT_SLUG;
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b bg-card">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="mx-auto flex h-(--header-height) max-w-(--content-width) items-center justify-between gap-4 px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2">
             {branding.logoUrl ? (
               <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-card">
@@ -48,6 +45,14 @@ export default async function PublicLayout({
           </Link>
 
           <nav className="flex items-center gap-2 sm:gap-4">
+            {isWisdomQuant && (
+              <Link
+                href={WISDOMQUANT_SITE_URL}
+                className="hidden text-sm font-medium text-muted-foreground hover:text-primary md:inline-block"
+              >
+                ← wisdomquant.com
+              </Link>
+            )}
             <Link
               href="/courses"
               className="hidden text-sm font-medium text-foreground hover:text-primary sm:inline-block"
@@ -60,29 +65,11 @@ export default async function PublicLayout({
             >
               Bundles
             </Link>
+            <PublicMobileNav isWisdomQuant={isWisdomQuant} wisdomQuantSiteUrl={WISDOMQUANT_SITE_URL} />
             <ThemeToggle />
-            {user ? (
-              <>
-                <NotificationBell notifications={notifications} unreadCount={unreadCount} />
-                <Button asChild size="icon" variant="outline" className="relative">
-                  <Link href="/cart" aria-label={`Cart${cartItemCount > 0 ? ` (${cartItemCount} items)` : ""}`}>
-                    <ShoppingCartIcon className="size-4" />
-                    {cartItemCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-white">
-                        {cartItemCount > 9 ? "9+" : cartItemCount}
-                      </span>
-                    )}
-                  </Link>
-                </Button>
-                <Button asChild size="sm">
-                  <Link href="/dashboard">My Dashboard</Link>
-                </Button>
-              </>
-            ) : (
-              <Button asChild size="sm" variant="outline">
-                <Link href="/login">Log In</Link>
-              </Button>
-            )}
+            <Suspense fallback={<PublicUserControlsFallback />}>
+              <PublicUserControls />
+            </Suspense>
           </nav>
         </div>
       </header>
@@ -90,7 +77,7 @@ export default async function PublicLayout({
       <main className="flex-1">{children}</main>
 
       <footer className="border-t bg-card py-6">
-        <div className="mx-auto max-w-6xl px-4 text-center text-sm text-muted-foreground sm:px-6">
+        <div className="mx-auto max-w-(--content-width) px-4 text-center text-sm text-muted-foreground sm:px-6">
           {branding.footerText || `© ${new Date().getFullYear()} ${branding.platformName}. All rights reserved.`}
         </div>
       </footer>

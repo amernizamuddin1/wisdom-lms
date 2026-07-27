@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveTenantFromHost } from "@/lib/tenant-resolver";
-import { platformPrisma } from "@/lib/prisma";
 
 // Server-to-server endpoints (payment gateway webhooks, cron triggers) are
 // hit directly by Razorpay/Vercel Cron on whatever host the deployment is
@@ -10,7 +9,17 @@ import { platformPrisma } from "@/lib/prisma";
 // must bypass tenant-host resolution entirely rather than 404 or silently
 // fall back to the dev default tenant.
 function isTenantExemptPath(pathname: string): boolean {
-  return pathname.startsWith("/api/webhooks") || pathname.startsWith("/api/cron");
+  return (
+    pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/api/cron") ||
+    pathname === "/api/vitals"
+  );
+}
+
+function hasSupabaseAuthCookie(request: NextRequest): boolean {
+  return request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
 }
 
 export async function proxy(request: NextRequest) {
@@ -18,8 +27,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const tenantStartedAt = performance.now();
   const host = request.headers.get("host") ?? "";
   const tenant = await resolveTenantFromHost(host);
+  const tenantDuration = performance.now() - tenantStartedAt;
 
   if (!tenant) {
     return new NextResponse("Unknown host — no tenant is configured for this domain.", {
@@ -42,61 +53,38 @@ export async function proxy(request: NextRequest) {
 
   let response = NextResponse.next({ request: { headers: requestHeaders } });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request: { headers: requestHeaders } });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
+  // Anonymous requests have no session to refresh. Skipping Supabase here keeps
+  // public catalogs, product pages, and auth pages off the remote auth critical
+  // path. Secure authorization remains in requireUser/requireAdmin near the data
+  // access it protects.
+  if (hasSupabaseAuthCookie(request)) {
+    const authStartedAt = performance.now();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+            response = NextResponse.next({ request: { headers: requestHeaders } });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options),
+            );
+          },
         },
       },
-    },
-  );
-
-  // getUser() also refreshes the Supabase session cookie, so this always runs
-  // (on every route) even though the admin-login redirect below only applies
-  // within /admin — matching the pre-widened-matcher behavior exactly.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (request.nextUrl.pathname.startsWith("/admin")) {
-    const isLoginPage = request.nextUrl.pathname === "/admin/login";
-
-    if (!user && !isLoginPage) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/admin/login";
-      return NextResponse.redirect(url);
-    }
-
-    if (user && isLoginPage) {
-      // Only skip the login form for someone who actually has an ACTIVE
-      // ADMIN membership in *this* tenant. A session-only check here (as
-      // this used to be) unconditionally bounced any authenticated user to
-      // /admin regardless of tenant membership — for an admin of a
-      // *different* tenant that's an infinite loop back to /admin/login
-      // (via requireAdmin -> requireUser both failing), which is exactly
-      // what made a cross-tenant login look like a silent refresh instead
-      // of a clear error.
-      const membership = await platformPrisma.tenantMembership.findUnique({
-        where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } },
-      });
-      if (membership?.status === "ACTIVE" && membership.role === "ADMIN") {
-        const url = request.nextUrl.clone();
-        url.pathname = "/admin";
-        return NextResponse.redirect(url);
-      }
-    }
+    );
+    await supabase.auth.getUser();
+    response.headers.append("Server-Timing", `auth;dur=${(performance.now() - authStartedAt).toFixed(1)}`);
   }
 
+  response.headers.append("Server-Timing", `tenant;dur=${tenantDuration.toFixed(1)}`);
+  if (process.env.VERCEL_GIT_COMMIT_SHA) {
+    response.headers.set("x-deployment-sha", process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 12));
+  }
   return response;
 }
 

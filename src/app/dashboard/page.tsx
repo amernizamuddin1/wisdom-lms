@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { SearchIcon, XIcon } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -9,7 +10,6 @@ import { Pagination } from "@/components/ui/pagination";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import GamificationSummaryWidget from "@/components/gamification/GamificationSummaryWidget";
-import SupabaseImage from "@/components/SupabaseImage";
 
 const PAGE_SIZE = 8;
 
@@ -194,16 +194,14 @@ async function CoursesSection({
                 >
                   <div className="relative aspect-video w-full overflow-hidden bg-muted">
                     {course.thumbnailUrl ? (
-                      <SupabaseImage
+                      <Image
                         src={course.thumbnailUrl}
                         alt={course.title}
                         fill
                         sizes="(min-width: 1024px) 420px, (min-width: 768px) calc((100vw - 140px) / 2), (min-width: 640px) calc((100vw - 68px) / 2), calc(100vw - 48px)"
                         quality={60}
                         className="object-contain transition-transform duration-[350ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] motion-safe:group-hover:scale-[1.04]"
-                        {...(index === 0
-                          ? { preload: true }
-                          : { loading: index === 1 ? "eager" as const : "lazy" as const })}
+                        {...(index === 0 ? { preload: true } : { loading: "lazy" as const })}
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">

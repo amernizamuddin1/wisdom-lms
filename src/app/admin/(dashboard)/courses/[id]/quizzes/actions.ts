@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { invalidatePublicCourseCache } from "@/lib/public-cache";
 import { requireAdmin } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant-context";
 import { prisma } from "@/lib/prisma";
@@ -59,6 +60,7 @@ export async function createQuiz(
     },
   });
 
+  await invalidatePublicCourseCache();
   redirect(`/admin/courses/${courseId}/quizzes/${quiz.id}`);
 }
 
@@ -88,6 +90,7 @@ export async function updateQuiz(
     data: { title, passPercentage, timeLimitMinutes },
   });
 
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}/quizzes/${quizId}`);
   return { success: true };
 }
@@ -95,6 +98,7 @@ export async function updateQuiz(
 export async function deleteQuiz(courseId: string, quizId: string) {
   await requireAdmin();
   await prisma.quiz.delete({ where: { id: quizId } });
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   redirect(`/admin/courses/${courseId}`);
 }

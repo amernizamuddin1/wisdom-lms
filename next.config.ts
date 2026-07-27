@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "10mb",
     },
+    webVitalsAttribution: ["LCP", "CLS"],
   },
   images: {
     // Lets next/image optimize (resize, re-encode, cache) the public course

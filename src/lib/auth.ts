@@ -5,6 +5,18 @@ import { prisma } from "@/lib/prisma";
 import { getTenantId } from "@/lib/tenant-context";
 import type { User } from "@/generated/prisma/client";
 
+const getAuthenticatedUser = cache(async function getAuthenticatedUser() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
+});
+
+const getProfile = cache(async function getProfile(userId: string): Promise<User | null> {
+  return prisma.user.findUnique({ where: { id: userId } });
+});
+
 // Looks up the caller's membership in the active tenant (resolved by
 // proxy.ts). A user can belong to several tenants with different roles, so
 // the tenant-scoped membership — not the legacy global User.role — is now
@@ -35,14 +47,11 @@ const getActiveMembership = cache(async function getActiveMembership(userId: str
 // to the same login form with `?error=no_access` so the page can explain
 // why, instead of silently landing back on a blank login form.
 export async function resolvePostLoginPath(loginPath: string = "/login"): Promise<string> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser();
 
   if (!user) return loginPath;
 
-  const profile = await prisma.user.findUnique({ where: { id: user.id } });
+  const profile = await getProfile(user.id);
   if (!profile) return loginPath;
 
   const membership = await getActiveMembership(profile.id);
@@ -55,16 +64,13 @@ export async function resolvePostLoginPath(loginPath: string = "/login"): Promis
 // within the same request in normal usage — cache() dedupes the Supabase Auth
 // call and the two Prisma lookups to once per request instead of once per caller.
 export const requireAdmin = cache(async function requireAdmin(): Promise<User> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser();
 
   if (!user) {
     redirect("/admin/login");
   }
 
-  const profile = await prisma.user.findUnique({ where: { id: user.id } });
+  const profile = await getProfile(user.id);
 
   if (!profile) {
     redirect("/admin/login");
@@ -83,16 +89,13 @@ export const requireAdmin = cache(async function requireAdmin(): Promise<User> {
 });
 
 export const requireUser = cache(async function requireUser(): Promise<User> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser();
 
   if (!user) {
     redirect("/login");
   }
 
-  const profile = await prisma.user.findUnique({ where: { id: user.id } });
+  const profile = await getProfile(user.id);
 
   if (!profile) {
     redirect("/login");
@@ -110,14 +113,11 @@ export const requireUser = cache(async function requireUser(): Promise<User> {
 // Non-redirecting lookup for public pages that render differently for signed-in
 // vs. anonymous visitors (e.g. Enroll vs. Go to Course) instead of gating access.
 export const getOptionalUser = cache(async function getOptionalUser(): Promise<User | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser();
 
   if (!user) return null;
 
-  const profile = await prisma.user.findUnique({ where: { id: user.id } });
+  const profile = await getProfile(user.id);
   if (!profile) return null;
 
   const membership = await getActiveMembership(profile.id);

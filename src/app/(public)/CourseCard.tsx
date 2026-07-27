@@ -23,7 +23,13 @@ type CourseCardData = {
   }[];
 };
 
-export default function CourseCard({ course }: { course: CourseCardData }) {
+export default function CourseCard({
+  course,
+  preloadImage = false,
+}: {
+  course: CourseCardData;
+  preloadImage?: boolean;
+}) {
   return (
     <Link
       href={`/courses/${course.id}`}
@@ -38,9 +44,9 @@ export default function CourseCard({ course }: { course: CourseCardData }) {
             src={course.thumbnailUrl}
             alt={course.title}
             fill
-            sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
+            sizes="(min-width: 1024px) 420px, (min-width: 640px) 50vw, 100vw"
             className="object-cover transition-transform duration-[350ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] motion-safe:group-hover:scale-[1.04]"
-            unoptimized
+            preload={preloadImage}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-muted text-sm text-muted-foreground">
