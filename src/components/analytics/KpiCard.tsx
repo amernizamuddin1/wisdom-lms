@@ -56,7 +56,7 @@ export default function KpiCard({
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           {Icon && (
-            <div className="flex size-9 items-center justify-center rounded-full bg-surface-brand-subtle text-primary transition-transform duration-[240ms] ease-out motion-safe:group-hover:scale-[1.07] motion-safe:group-hover:rotate-[2deg]">
+            <div className="flex size-9 items-center justify-center rounded-full bg-surface-brand-subtle text-primary transition-transform duration-[240ms] ease-out motion-safe:group-hover:scale-[1.07]">
               <Icon className="size-4" />
             </div>
           )}

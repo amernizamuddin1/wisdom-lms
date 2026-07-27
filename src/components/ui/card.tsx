@@ -10,7 +10,7 @@ const cardVariants = cva(
   cn(
     "rounded-xl border border-card-border bg-white text-card-foreground",
     "transition-[transform,box-shadow,border-color,background-color] duration-[240ms] ease-out [transform-origin:center]",
-    "motion-safe:hover:-translate-y-0.5 odd:motion-safe:hover:rotate-[-0.35deg] even:motion-safe:hover:rotate-[0.35deg]",
+    "motion-safe:hover:-translate-y-0.5",
     "dark:bg-card",
   ),
   {
@@ -19,14 +19,12 @@ const cardVariants = cva(
         default: "dark:shadow-card",
         kpi: cn(
           "hover:bg-white motion-safe:hover:-translate-y-[5px]",
-          "odd:motion-safe:hover:rotate-[-0.4deg] even:motion-safe:hover:rotate-[0.4deg]",
           "dark:shadow-card dark:hover:bg-indigo/10 dark:hover:border-indigo/30",
           "dark:hover:shadow-[0_16px_32px_-12px_color-mix(in_oklab,var(--color-indigo)_45%,transparent)]",
           FOCUS_RING,
         ),
         course: cn(
           "motion-safe:hover:-translate-y-[6px]",
-          "odd:motion-safe:hover:rotate-[-0.5deg] even:motion-safe:hover:rotate-[0.5deg]",
           "dark:shadow-card dark:hover:border-indigo/30",
           "dark:hover:shadow-[0_16px_32px_-12px_color-mix(in_oklab,var(--color-indigo)_45%,transparent)]",
           FOCUS_RING,
