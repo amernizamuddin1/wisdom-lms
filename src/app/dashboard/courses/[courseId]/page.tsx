@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DownloadIcon, FileTextIcon, MessageSquareIcon } from "lucide-react";
@@ -16,6 +17,11 @@ import CourseSidebarNav from "./CourseSidebarNav";
 import MobileCourseDrawer from "./MobileCourseDrawer";
 import LessonTimeTracker from "@/components/gamification/LessonTimeTracker";
 
+type LessonMedia = {
+  signedFiles: { id: string; fileName: string; url: string | null }[];
+  audioUrl: string | null;
+};
+
 export default async function CourseViewPage({
   params,
   searchParams,
@@ -23,28 +29,31 @@ export default async function CourseViewPage({
   params: Promise<{ courseId: string }>;
   searchParams: Promise<{ lesson?: string }>;
 }) {
-  const user = await requireUser();
-  const { courseId } = await params;
-  const { lesson: selectedLessonId } = await searchParams;
+  const [user, { courseId }, { lesson: selectedLessonId }] = await Promise.all([
+    requireUser(),
+    params,
+    searchParams,
+  ]);
 
-  const enrollment = await prisma.enrollment.findFirst({
-    where: { userId: user.id, courseId, status: "ACTIVE" },
-  });
-  if (!enrollment) notFound();
-
-  const course = await prisma.course.findUnique({
-    where: { id: courseId },
-    include: {
-      quizzes: { where: { chapterId: null }, orderBy: { title: "asc" } },
-      chapters: {
-        orderBy: { order: "asc" },
-        include: {
-          lessons: { orderBy: { order: "asc" }, include: { files: true } },
-          quizzes: { orderBy: { title: "asc" } },
+  const [enrollment, course] = await Promise.all([
+    prisma.enrollment.findFirst({
+      where: { userId: user.id, courseId, status: "ACTIVE" },
+    }),
+    prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        quizzes: { where: { chapterId: null }, orderBy: { title: "asc" } },
+        chapters: {
+          orderBy: { order: "asc" },
+          include: {
+            lessons: { orderBy: { order: "asc" }, include: { files: true } },
+            quizzes: { orderBy: { title: "asc" } },
+          },
         },
       },
-    },
-  });
+    }),
+  ]);
+  if (!enrollment) notFound();
   if (!course) notFound();
 
   if (course.learningStatus === "PAUSED") {
@@ -59,8 +68,10 @@ export default async function CourseViewPage({
     ...course.quizzes.map((q) => q.id),
     ...course.chapters.flatMap((c) => c.quizzes.map((q) => q.id)),
   ];
+  const activeLesson =
+    allLessons.find((l) => l.id === selectedLessonId) ?? allLessons[0] ?? null;
 
-  const [completedLessons, passedAttempts] = await Promise.all([
+  const progressPromise = Promise.all([
     prisma.lessonProgress.findMany({
       where: {
         userId: user.id,
@@ -75,28 +86,24 @@ export default async function CourseViewPage({
     }),
   ]);
 
-  const completedLessonIds = new Set(completedLessons.map((l) => l.lessonId));
-  const passedQuizIds = new Set(passedAttempts.map((a) => a.quizId));
+  const mediaPromise: Promise<LessonMedia> = (async () => {
+    const signedFiles: { id: string; fileName: string; url: string | null }[] = [];
+    let audioUrl: string | null = null;
 
-  const activeLesson =
-    allLessons.find((l) => l.id === selectedLessonId) ?? allLessons[0] ?? null;
-  const isActiveLessonCompleted = activeLesson ? completedLessonIds.has(activeLesson.id) : false;
+    if (!activeLesson || (activeLesson.files.length === 0 && activeLesson.lessonType !== "AUDIO")) {
+      return { signedFiles, audioUrl };
+    }
 
-  let signedFiles: { id: string; fileName: string; url: string | null }[] = [];
-  let audioUrl: string | null = null;
-
-  if (activeLesson && (activeLesson.files.length > 0 || activeLesson.lessonType === "AUDIO")) {
     const supabase = createAdminClient();
-
     if (activeLesson.files.length > 0) {
-      signedFiles = await Promise.all(
+      signedFiles.push(...await Promise.all(
         activeLesson.files.map(async (file) => {
           const { data } = await supabase.storage
             .from("lesson-files")
             .createSignedUrl(file.fileUrl, 600);
           return { id: file.id, fileName: file.fileName, url: data?.signedUrl ?? null };
         }),
-      );
+      ));
     }
 
     if (activeLesson.lessonType === "AUDIO" && activeLesson.videoUrl) {
@@ -111,7 +118,15 @@ export default async function CourseViewPage({
         audioUrl = data?.signedUrl ?? null;
       }
     }
-  }
+
+    return { signedFiles, audioUrl };
+  })();
+
+  const [completedLessons, passedAttempts] = await progressPromise;
+
+  const completedLessonIds = new Set(completedLessons.map((l) => l.lessonId));
+  const passedQuizIds = new Set(passedAttempts.map((a) => a.quizId));
+  const isActiveLessonCompleted = activeLesson ? completedLessonIds.has(activeLesson.id) : false;
 
   const sidebarChapters = course.chapters.map((chapter) => ({
     id: chapter.id,
@@ -202,13 +217,15 @@ export default async function CourseViewPage({
                   />
                 )}
 
-              {activeLesson.lessonType === "AUDIO" && audioUrl && (
-                <AudioLessonPlayer
-                  courseId={courseId}
-                  lessonId={activeLesson.id}
-                  audioUrl={audioUrl}
-                  completed={isActiveLessonCompleted}
-                />
+              {activeLesson.lessonType === "AUDIO" && activeLesson.videoUrl && (
+                <Suspense fallback={<div className="h-16 animate-pulse rounded-lg bg-muted" />}>
+                  <AudioLessonSection
+                    courseId={courseId}
+                    lessonId={activeLesson.id}
+                    completed={isActiveLessonCompleted}
+                    mediaPromise={mediaPromise}
+                  />
+                </Suspense>
               )}
 
               {activeLesson.lessonType === "TEXT" && activeLesson.textContent && (
@@ -250,27 +267,9 @@ export default async function CourseViewPage({
                 </TabsContent>
                 <TabsContent value="files" className="pt-2">
                   <div className="rounded-lg border border-warning/30 bg-warning-soft p-4 text-warning">
-                    {signedFiles.length > 0 ? (
-                      <ul className="space-y-1">
-                        {signedFiles.map((file) =>
-                          file.url ? (
-                            <li key={file.id}>
-                              <a
-                                href={file.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-sm font-medium underline-offset-2 hover:underline"
-                              >
-                                <DownloadIcon className="size-4" />
-                                {file.fileName}
-                              </a>
-                            </li>
-                          ) : null,
-                        )}
-                      </ul>
-                    ) : (
-                      <p className="text-sm opacity-80">No downloadable files for this lesson.</p>
-                    )}
+                    <Suspense fallback={<div className="h-5 w-40 animate-pulse rounded bg-warning/15" />}>
+                      <DownloadableFilesSection mediaPromise={mediaPromise} />
+                    </Suspense>
                   </div>
                 </TabsContent>
               </Tabs>
@@ -279,5 +278,60 @@ export default async function CourseViewPage({
         </div>
       </section>
     </div>
+  );
+}
+
+async function AudioLessonSection({
+  courseId,
+  lessonId,
+  completed,
+  mediaPromise,
+}: {
+  courseId: string;
+  lessonId: string;
+  completed: boolean;
+  mediaPromise: Promise<LessonMedia>;
+}) {
+  const { audioUrl } = await mediaPromise;
+  if (!audioUrl) return null;
+
+  return (
+    <AudioLessonPlayer
+      courseId={courseId}
+      lessonId={lessonId}
+      audioUrl={audioUrl}
+      completed={completed}
+    />
+  );
+}
+
+async function DownloadableFilesSection({
+  mediaPromise,
+}: {
+  mediaPromise: Promise<LessonMedia>;
+}) {
+  const { signedFiles } = await mediaPromise;
+  const availableFiles = signedFiles.filter((file) => file.url);
+
+  if (availableFiles.length === 0) {
+    return <p className="text-sm opacity-80">No downloadable files for this lesson.</p>;
+  }
+
+  return (
+    <ul className="space-y-1">
+      {availableFiles.map((file) => (
+        <li key={file.id}>
+          <a
+            href={file.url ?? undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm font-medium underline-offset-2 hover:underline"
+          >
+            <DownloadIcon className="size-4" />
+            {file.fileName}
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 }
