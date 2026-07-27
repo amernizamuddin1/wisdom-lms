@@ -71,37 +71,42 @@ async function CoursesSection({
     ...(q ? { course: { title: { contains: q, mode: "insensitive" as const } } } : {}),
   };
 
-  const [enrollments, total, allEnrollmentCount] = await Promise.all([
-    prisma.enrollment.findMany({
-      where,
-      select: {
-        id: true,
-        course: {
-          select: {
-            id: true,
-            title: true,
-            thumbnailUrl: true,
-            quizzes: { where: { chapterId: null }, select: { id: true } },
-            chapters: {
-              select: {
-                lessons: { select: { id: true } },
-                quizzes: { select: { id: true } },
-              },
+  const enrollmentsPromise = prisma.enrollment.findMany({
+    where,
+    select: {
+      id: true,
+      course: {
+        select: {
+          id: true,
+          title: true,
+          thumbnailUrl: true,
+          quizzes: { where: { chapterId: null }, select: { id: true } },
+          chapters: {
+            select: {
+              lessons: { select: { id: true } },
+              quizzes: { select: { id: true } },
             },
           },
         },
       },
-      orderBy: { enrolledAt: "desc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    }),
-    prisma.enrollment.count({ where }),
-    q
-      ? prisma.enrollment.count({ where: { userId, status: "ACTIVE" } })
-      : Promise.resolve(0),
-  ]);
+    },
+    orderBy: { enrolledAt: "desc" },
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+  });
+  const totalPromise = prisma.enrollment.count({ where });
+  const allEnrollmentCountPromise = q
+    ? prisma.enrollment.count({ where: { userId, status: "ACTIVE" } })
+    : Promise.resolve(0);
 
-  const hasAnyEnrollments = q ? allEnrollmentCount > 0 : total > 0;
+  // Only the enrollment rows are needed to emit the course cards and their
+  // LCP image. Keep counts off the critical path unless this page is empty.
+  const enrollments = await enrollmentsPromise;
+  const hasAnyEnrollments = enrollments.length > 0
+    ? true
+    : q
+      ? (await allEnrollmentCountPromise) > 0
+      : (await totalPromise) > 0;
 
   const allLessonIds = enrollments.flatMap((e) =>
     e.course.chapters.flatMap((c) => c.lessons.map((l) => l.id)),
@@ -131,15 +136,6 @@ async function CoursesSection({
     completedLessonIds: new Set(completedLessons.map((l) => l.lessonId)),
     passedQuizIds: new Set(passedAttempts.map((a) => a.quizId)),
   }));
-
-  function buildHref(overrides: { page?: number }): string {
-    const sp = new URLSearchParams();
-    if (q) sp.set("q", q);
-    const nextPage = overrides.page ?? page;
-    if (nextPage > 1) sp.set("page", String(nextPage));
-    const qs = sp.toString();
-    return qs ? `/dashboard?${qs}` : "/dashboard";
-  }
 
   return (
     <>
@@ -203,6 +199,7 @@ async function CoursesSection({
                         alt={course.title}
                         fill
                         sizes="(min-width: 1024px) 420px, (min-width: 768px) calc((100vw - 140px) / 2), (min-width: 640px) calc((100vw - 68px) / 2), calc(100vw - 48px)"
+                        quality={60}
                         className="object-contain transition-transform duration-[350ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] motion-safe:group-hover:scale-[1.04]"
                         {...(index === 0
                           ? { preload: true }
@@ -229,15 +226,45 @@ async function CoursesSection({
             })}
           </div>
 
-          <Pagination
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={total}
-            buildHref={(p) => buildHref({ page: p })}
-          />
+          <Suspense fallback={null}>
+            <CoursesPagination
+              page={page}
+              q={q}
+              totalPromise={totalPromise}
+            />
+          </Suspense>
         </>
       )}
     </>
+  );
+}
+
+async function CoursesPagination({
+  page,
+  q,
+  totalPromise,
+}: {
+  page: number;
+  q: string;
+  totalPromise: Promise<number>;
+}) {
+  const total = await totalPromise;
+
+  function buildHref(nextPage: number): string {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (nextPage > 1) sp.set("page", String(nextPage));
+    const qs = sp.toString();
+    return qs ? `/dashboard?${qs}` : "/dashboard";
+  }
+
+  return (
+    <Pagination
+      page={page}
+      pageSize={PAGE_SIZE}
+      total={total}
+      buildHref={buildHref}
+    />
   );
 }
 
