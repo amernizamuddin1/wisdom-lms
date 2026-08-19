@@ -1,0 +1,71 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    - cron: "0 10 * * 1,4"
+      timezone: "Asia/Kolkata"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keep-alive:
+    name: Check Supabase projects
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check Supabase Project 1
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_PROJECT_1_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_PROJECT_1_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$SUPABASE_URL" || -z "$SUPABASE_KEY" ]]; then
+            echo "::error::Project 1 URL or key is missing."
+            exit 1
+          fi
+
+          curl \
+            --silent \
+            --show-error \
+            --fail-with-body \
+            --retry 2 \
+            --retry-all-errors \
+            --connect-timeout 15 \
+            --max-time 45 \
+            --header "apikey: $SUPABASE_KEY" \
+            "${SUPABASE_URL%/}/rest/v1/keep_alive?select=id&limit=1"
+
+          echo
+          echo "Project 1 responded successfully."
+
+      - name: Check Supabase Project 2
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_PROJECT_2_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_PROJECT_2_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$SUPABASE_URL" || -z "$SUPABASE_KEY" ]]; then
+            echo "::error::Project 2 URL or key is missing."
+            exit 1
+          fi
+
+          curl \
+            --silent \
+            --show-error \
+            --fail-with-body \
+            --retry 2 \
+            --retry-all-errors \
+            --connect-timeout 15 \
+            --max-time 45 \
+            --header "apikey: $SUPABASE_KEY" \
+            "${SUPABASE_URL%/}/rest/v1/keep_alive?select=id&limit=1"
+
+          echo
+          echo "Project 2 responded successfully."
