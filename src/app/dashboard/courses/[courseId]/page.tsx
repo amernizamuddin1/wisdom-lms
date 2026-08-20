@@ -139,7 +139,7 @@ export default async function CourseViewPage({
   const passedQuizIdList = [...passedQuizIds];
 
   return (
-    <div className="lg:grid lg:grid-cols-[360px_1fr] lg:items-start lg:gap-6">
+    <div className="lg:grid lg:grid-cols-[420px_1fr] lg:items-start lg:gap-6">
       <div className="mb-4 lg:hidden">
         <MobileCourseDrawer
           courseId={courseId}
@@ -175,7 +175,7 @@ export default async function CourseViewPage({
       </aside>
 
       <section className="min-w-0">
-        <div className="mx-auto w-full max-w-[1100px] space-y-4">
+        <div className="w-full max-w-[1100px] space-y-4">
           {!activeLesson ? (
             <p className="text-muted-foreground">This course has no lessons yet.</p>
           ) : (
