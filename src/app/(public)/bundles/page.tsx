@@ -56,7 +56,7 @@ export default async function BundlesCatalogPage({
   const allTags = Array.from(new Set(activeBundles.flatMap((b) => b.tags))).sort();
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-(--content-width) px-4 py-10 sm:px-6">
       <div className="mb-8 space-y-2">
         <h1 className="text-3xl font-bold text-foreground">Course Bundles</h1>
         <p className="font-body text-muted-foreground">

@@ -55,7 +55,7 @@ export default async function CoursesCatalogPage({
   const allTags = Array.from(new Set(publishedCourses.flatMap((c) => c.tags))).sort();
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-(--content-width) px-4 py-10 sm:px-6">
       <div className="mb-8 space-y-2">
         <h1 className="text-3xl font-bold text-foreground">Browse Courses</h1>
         <p className="font-body text-muted-foreground">
@@ -73,7 +73,7 @@ export default async function CoursesCatalogPage({
       {courses.length === 0 ? (
         <p className="text-muted-foreground">No courses match your filters.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 justify-start gap-5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(320px,420px))]">
           {courses.map((course) => (
             <CourseCard key={course.id} course={course} />
           ))}

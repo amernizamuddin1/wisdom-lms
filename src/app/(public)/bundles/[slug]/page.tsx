@@ -60,7 +60,7 @@ export default async function BundleDetailPage({
   const isEnrolled = enrollment?.status === "ACTIVE";
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_340px]">
+    <div className="mx-auto grid max-w-(--content-width) gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_340px]">
       <div className="space-y-8">
         <div className="space-y-3">
           {bundle.tags.length > 0 && (

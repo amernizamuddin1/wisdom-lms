@@ -140,7 +140,7 @@ function VimeoEmbed({
   if (!embedUrl) return null;
 
   return (
-    <div className="aspect-video w-full overflow-hidden rounded-md bg-black">
+    <div className="aspect-video w-full overflow-hidden rounded-lg bg-black">
       <iframe
         ref={iframeRef}
         src={embedUrl}
@@ -293,7 +293,7 @@ function YouTubePlayerView({
   return (
     <div
       ref={containerRef}
-      className="group relative aspect-video w-full overflow-hidden rounded-md bg-black"
+      className="group relative aspect-video w-full overflow-hidden rounded-lg bg-black"
     >
       <div ref={mountRef} className="absolute inset-0 h-full w-full" />
 
@@ -322,7 +322,7 @@ function YouTubePlayerView({
           <button
             type="button"
             onClick={replay}
-            className="rounded-md bg-white/90 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-white"
+            className="rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-white"
           >
             ↺ Replay
           </button>
