@@ -12,7 +12,13 @@ datasource db {
 
 enum Role {
   ADMIN
+  GROUP_ADMIN
   STUDENT
+}
+
+enum GroupStatus {
+  ACTIVE
+  ARCHIVED
 }
 
 enum CourseStatus {
@@ -187,6 +193,8 @@ model Tenant {
   updatedAt     DateTime     @updatedAt @map("updated_at")
 
   memberships TenantMembership[]
+  groups      Group[]
+  groupMemberships GroupMembership[]
 
   settings                  Settings?
   courses                   Course[]
@@ -262,10 +270,56 @@ model TenantMembership {
   createdAt DateTime         @default(now()) @map("created_at")
   updatedAt DateTime         @updatedAt @map("updated_at")
 
+  // Only set when role = GROUP_ADMIN — scopes this admin to a single Group
+  // within the tenant. Null for ADMIN (unrestricted) and STUDENT (a
+  // student's group membership(s) live in GroupMembership instead, since a
+  // student can belong to multiple groups but a sub-admin administers one).
+  groupId String? @map("group_id")
+  group   Group?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
   @@unique([tenantId, userId])
   @@index([userId])
   @@index([tenantId, role])
   @@map("tenant_memberships")
+}
+
+// An institution/school/company onboarded under a tenant (e.g. WisdomQuant).
+// Only the tenant ADMIN can create these. A GROUP_ADMIN is scoped to
+// exactly one Group via TenantMembership.groupId; students can belong to
+// several via GroupMembership.
+model Group {
+  id        String      @id @default(uuid())
+  tenantId  String      @map("tenant_id")
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String
+  status    GroupStatus @default(ACTIVE)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  adminMemberships TenantMembership[]
+  memberships      GroupMembership[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("groups")
+}
+
+// Student-side membership in a Group — many-to-many, unlike the
+// single-group scoping used for GROUP_ADMIN on TenantMembership.
+model GroupMembership {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  groupId   String   @map("group_id")
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([groupId, userId])
+  @@index([tenantId, userId])
+  @@map("group_memberships")
 }
 
 // Profile table for app users. Row id matches the corresponding Supabase
@@ -288,6 +342,7 @@ model User {
   courses                  Course[]                    @relation("CourseCreatedBy")
   bundlesCreated           CourseBundle[]              @relation("BundleCreatedBy")
   tenantMemberships        TenantMembership[]
+  groupMemberships         GroupMembership[]
   enrollments              Enrollment[]
   bundleEnrollments        BundleEnrollment[]
   bundleEnrollmentsRevoked BundleEnrollment[]          @relation("BundleEnrollmentRevokedBy")

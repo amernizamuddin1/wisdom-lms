@@ -65,6 +65,8 @@ export const TENANT_SCOPED_MODELS = new Set([
   "GamificationLevel",
   "XpRule",
   "AchievementDefinition",
+  "Group",
+  "GroupMembership",
 ]);
 
 export const READ_OPERATIONS = new Set([

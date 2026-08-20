@@ -29,10 +29,11 @@ import { toggleReaction, type ReactionEntityType } from "@/lib/community/reactio
 import { toggleFollow } from "@/lib/community/follows";
 import { createReport, type ReportReason } from "@/lib/community/reports";
 import { prisma } from "@/lib/prisma";
+import type { Role } from "@/generated/prisma/client";
 
 export type ActionResult = { error?: string; success?: boolean };
 
-async function assertCourseAccess(userId: string, courseId: string, role: "ADMIN" | "STUDENT") {
+async function assertCourseAccess(userId: string, courseId: string, role: Role) {
   if (!(await canAccessCourseDiscussion(userId, courseId, role))) {
     throw new Error("You no longer have access to this course's discussion board.");
   }

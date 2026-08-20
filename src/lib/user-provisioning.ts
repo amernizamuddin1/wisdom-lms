@@ -35,6 +35,26 @@ export async function ensureTenantMembership(
   return { created: true };
 }
 
+// Idempotent, mirroring ensureTenantMembership above — a second call for the
+// same (groupId, userId) pair is a no-op. Unlike TenantMembership (one row per
+// user per tenant), a user can belong to several groups, so this is a plain
+// upsert-style check against the @@unique([groupId, userId]) constraint
+// rather than a single-slot assignment.
+export async function ensureGroupMembership(
+  tx: PrismaTransaction,
+  params: { tenantId: string; groupId: string; userId: string },
+): Promise<{ created: boolean }> {
+  const existing = await tx.groupMembership.findUnique({
+    where: { groupId_userId: { groupId: params.groupId, userId: params.userId } },
+    select: { id: true },
+  });
+  if (existing) return { created: false };
+  await tx.groupMembership.create({
+    data: { tenantId: params.tenantId, groupId: params.groupId, userId: params.userId },
+  });
+  return { created: true };
+}
+
 // Creates a new Supabase Auth + Prisma User account (no sign-in). Shared by
 // findOrCreateUser (below, random password) and any flow that already has a
 // password of its own to set — self-serve registration, CSV bulk user import.

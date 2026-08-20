@@ -2,15 +2,18 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { isAccessExpired } from "@/lib/access";
 import { getTenantId } from "@/lib/tenant-context";
+import type { Role } from "@/generated/prisma/client";
 
 // Course discussion entitlement check — reuses the existing hot-path pattern
 // (Enrollment row with status ACTIVE for [userId, courseId]) plus
 // isAccessExpired() to also reject expired-but-not-yet-recomputed rows.
 // Admins always pass (moderation console needs to see every course board).
+// A GROUP_ADMIN is not a global admin, so falls through to the same
+// enrollment check as a STUDENT.
 export async function canAccessCourseDiscussion(
   userId: string,
   courseId: string,
-  role?: "ADMIN" | "STUDENT",
+  role?: Role,
 ): Promise<boolean> {
   if (role === "ADMIN") return true;
 

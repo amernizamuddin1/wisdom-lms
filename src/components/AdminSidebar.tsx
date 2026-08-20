@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   BarChart3Icon,
+  Building2Icon,
   FlagIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
@@ -43,6 +44,7 @@ const NAV_ITEMS = [
   { href: "/admin/courses", label: "Courses", icon: GraduationCapIcon, exact: false },
   { href: "/admin/bundles", label: "Course Bundles", icon: PackageIcon, exact: false },
   { href: "/admin/instructors", label: "Instructors", icon: UserCogIcon, exact: false },
+  { href: "/admin/groups", label: "Institutions", icon: Building2Icon, exact: false },
   { href: "/admin/orders", label: "Orders", icon: ReceiptIcon, exact: false },
   { href: "/admin/coupons", label: "Coupons", icon: TicketPercentIcon, exact: false },
   { href: "/admin/enrollments/new", label: "Enrollments", icon: UserPlusIcon, exact: false },
