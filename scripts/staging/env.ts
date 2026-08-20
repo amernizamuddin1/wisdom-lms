@@ -12,8 +12,8 @@ import path from "path";
 const ENV_PATH = path.resolve(__dirname, "../../.env.staging.local");
 const GITIGNORE_PATH = path.resolve(__dirname, "../../.gitignore");
 
-const STAGING_PROJECT_REF = "wxhesjgjlufjwwtahqsu";
-const PRODUCTION_PROJECT_REF = "peqzxcbtawpvijzllkdw";
+export const STAGING_PROJECT_REF = "wxhesjgjlufjwwtahqsu";
+export const PRODUCTION_PROJECT_REF = "peqzxcbtawpvijzllkdw";
 
 dotenv.config({ path: ENV_PATH, override: true });
 
@@ -92,6 +92,48 @@ function checkUrl(name: string, rawUrl: string | undefined): void {
 
 checkUrl("DATABASE_URL", process.env.DATABASE_URL);
 checkUrl("DIRECT_URL", process.env.DIRECT_URL);
+
+// Supabase Storage/Auth admin calls go over the REST API URL, not the Postgres
+// connection strings above, so it needs its own ref check: the hostname shape
+// here is "<ref>.supabase.co" (no "db." prefix, no username-embedded ref).
+export function checkSupabaseApiUrl(name: string, rawUrl: string | undefined): void {
+  if (!rawUrl) {
+    throw new Error(`${name} is not set. Expected .env.staging.local to define it.`);
+  }
+
+  let hostname: string;
+  try {
+    hostname = new URL(rawUrl).hostname;
+  } catch {
+    throw new Error(`Could not parse ${name} as a URL: ${redact(rawUrl)}`);
+  }
+
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    console.log(`[staging] ${name} -> local Supabase at ${hostname} (guard passed).`);
+    return;
+  }
+
+  const match = hostname.match(/^([a-z0-9]+)\.supabase\.co$/);
+  const ref = match ? match[1] : null;
+
+  if (ref === PRODUCTION_PROJECT_REF) {
+    throw new Error(
+      `Refusing to run: ${name} points at the PRODUCTION Supabase project ` +
+        `(${PRODUCTION_PROJECT_REF}, ${redact(rawUrl)}). Staging scripts must never run against production.`,
+    );
+  }
+
+  if (ref !== STAGING_PROJECT_REF) {
+    throw new Error(
+      `Refusing to run: ${name} points at an unrecognized Supabase project ref "${ref}" (${redact(rawUrl)}). ` +
+        `Only the staging project (${STAGING_PROJECT_REF}) is allowed.`,
+    );
+  }
+
+  console.log(`[staging] ${name} -> Supabase STAGING project ${STAGING_PROJECT_REF} (${redact(rawUrl)}) (guard passed).`);
+}
+
+checkSupabaseApiUrl("NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 let gitignoreOk = false;
 try {
