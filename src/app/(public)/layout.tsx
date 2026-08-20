@@ -4,8 +4,14 @@ import Image from "next/image";
 import { GraduationCapIcon } from "lucide-react";
 import { getBranding } from "@/lib/branding";
 import { getOptionalTenantContext } from "@/lib/tenant-context";
+import { getOptionalUser } from "@/lib/auth";
 import { WISDOMQUANT_SITE_URL, WISDOMQUANT_TENANT_SLUG } from "@/lib/tenant-theme";
 import ThemeToggle from "@/components/ThemeToggle";
+import DashboardChrome from "@/components/DashboardChrome";
+import {
+  NotificationBellFallback,
+  NotificationBellServer,
+} from "@/components/NotificationBellServer";
 import {
   default as PublicUserControls,
   PublicUserControlsFallback,
@@ -17,8 +23,32 @@ export default async function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [branding, tenant] = await Promise.all([getBranding(), getOptionalTenantContext()]);
+  const [branding, tenant, user] = await Promise.all([
+    getBranding(),
+    getOptionalTenantContext(),
+    getOptionalUser(),
+  ]);
   const isWisdomQuant = tenant?.tenantSlug === WISDOMQUANT_TENANT_SLUG;
+
+  // A logged-in visitor gets the same persistent sidebar shell as /dashboard
+  // on every page here (catalog browsing, cart, checkout) — one continuous
+  // app experience instead of switching between a marketing header and the
+  // app shell mid-session. Logged-out visitors keep the marketing chrome below.
+  if (user) {
+    return (
+      <DashboardChrome
+        userEmail={user.email}
+        platformName={branding.platformName}
+        notificationBell={
+          <Suspense fallback={<NotificationBellFallback />}>
+            <NotificationBellServer userId={user.id} />
+          </Suspense>
+        }
+      >
+        {children}
+      </DashboardChrome>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
