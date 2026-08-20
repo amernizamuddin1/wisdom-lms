@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { SearchIcon, XIcon } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { getTenantId } from "@/lib/tenant-context";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,10 +25,20 @@ export default async function MyCoursesPage({
   searchParams: Promise<{ q?: string; page?: string }>;
 }) {
   const user = await requireUser();
+  const tenantId = await getTenantId();
+  const groupMembership = await prisma.groupMembership.findFirst({
+    where: { tenantId, userId: user.id },
+    select: { group: { select: { name: true } } },
+  });
+
+  const firstName = user.name.trim().split(/\s+/)[0];
+  const heading = groupMembership
+    ? `Hello, ${firstName} | ${groupMembership.group.name} | Available Courses`
+    : `Hello, ${firstName} | Available Courses`;
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-foreground">My Courses</h2>
+      <h2 className="text-xl font-semibold text-foreground">{heading}</h2>
 
       <Suspense
         fallback={
