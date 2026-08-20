@@ -184,7 +184,7 @@ async function CoursesSection({
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 justify-start gap-5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(320px,420px))]">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
             {enrollments.map((enrollment, index) => {
               const course = enrollment.course;
               const lessonIds = course.chapters.flatMap((c) =>
@@ -199,17 +199,17 @@ async function CoursesSection({
                 <div
                   key={enrollment.id}
                   className={cn(
-                    "group flex w-full flex-col overflow-hidden",
+                    "group flex w-full flex-col overflow-hidden sm:rounded-lg",
                     cardVariants({ variant: "course" }),
                   )}
                 >
-                  <div className="relative aspect-video w-full overflow-hidden bg-muted">
+                  <div className="relative aspect-video sm:aspect-[2/1] w-full overflow-hidden bg-muted">
                     {course.thumbnailUrl ? (
                       <Image
                         src={course.thumbnailUrl}
                         alt={course.title}
                         fill
-                        sizes="(min-width: 1024px) 420px, (min-width: 768px) calc((100vw - 140px) / 2), (min-width: 640px) calc((100vw - 68px) / 2), calc(100vw - 48px)"
+                        sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                         quality={60}
                         className="object-contain transition-transform duration-[350ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] motion-safe:group-hover:scale-[1.04]"
                         {...(index === 0 ? { preload: true } : { loading: "lazy" as const })}
@@ -279,8 +279,8 @@ async function CoursesPagination({
 
 function CourseDetailsSkeleton({ title }: { title: string }) {
   return (
-    <div className="space-y-2 p-3">
-      <h3 className="line-clamp-2 text-sm font-medium text-foreground">{title}</h3>
+    <div className="space-y-1.5 p-3 sm:space-y-1 sm:p-2.5">
+      <h3 className="line-clamp-2 text-sm font-medium text-foreground sm:line-clamp-1">{title}</h3>
       <div className="space-y-1" aria-label="Loading course progress">
         <div className="h-1.5 w-full animate-pulse rounded-full bg-surface-tertiary" />
         <div className="h-4 w-20 animate-pulse rounded bg-surface-tertiary" />
@@ -313,8 +313,8 @@ async function CourseDetails({
     : 0;
 
   return (
-    <div className="space-y-2 p-3">
-      <h3 className="line-clamp-2 text-sm font-medium text-foreground">{title}</h3>
+    <div className="space-y-1.5 p-3 sm:space-y-1 sm:p-2.5">
+      <h3 className="line-clamp-2 text-sm font-medium text-foreground sm:line-clamp-1">{title}</h3>
       <div>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-tertiary">
           <div className="h-full bg-primary" style={{ width: `${percent}%` }} />
