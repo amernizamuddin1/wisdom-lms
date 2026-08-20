@@ -40,7 +40,7 @@ export default async function CoursesCatalogPage({
       {courses.length === 0 ? (
         <p className="text-muted-foreground">No courses match your filters.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(230px,1fr))]">
           {courses.map((course, index) => (
             <CourseCard key={course.id} course={course} preloadImage={index === 0} />
           ))}

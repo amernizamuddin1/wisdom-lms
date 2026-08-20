@@ -38,13 +38,13 @@ export default function CourseCard({
         cardVariants({ variant: "course" }),
       )}
     >
-      <div className="relative aspect-video w-full overflow-hidden">
+      <div className="relative aspect-video sm:aspect-[2/1] w-full overflow-hidden">
         {course.thumbnailUrl ? (
           <Image
             src={course.thumbnailUrl}
             alt={course.title}
             fill
-            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
             className="object-cover transition-transform duration-[350ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] motion-safe:group-hover:scale-[1.04]"
             preload={preloadImage}
           />
@@ -54,8 +54,8 @@ export default function CourseCard({
           </div>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-2 p-3">
-        <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-foreground group-hover:text-primary">
+      <div className="flex flex-1 flex-col gap-1.5 p-3 sm:gap-1 sm:p-2.5">
+        <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-foreground group-hover:text-primary sm:line-clamp-1">
           {course.title}
         </h3>
         {course.tags.length > 0 && (
@@ -71,7 +71,7 @@ export default function CourseCard({
             ))}
           </div>
         )}
-        <div className="mt-auto pt-1">
+        <div className="mt-auto">
           <PriceDisplay isFree={course.isFree} prices={course.prices} size="sm" />
         </div>
       </div>
