@@ -4,7 +4,10 @@ import { requireGroupAccess, getGroupScope } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant-context";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import RenameGroupForm from "./RenameGroupForm";
+import MemberActions from "./MemberActions";
 
 export default async function GroupRosterPage({
   params,
@@ -33,11 +36,21 @@ export default async function GroupRosterPage({
     },
   });
 
+  const tenantMemberships = await prisma.tenantMembership.findMany({
+    where: { tenantId, userId: { in: members.map((m) => m.userId) } },
+    select: { userId: true, status: true },
+  });
+  const statusByUserId = new Map(tenantMemberships.map((tm) => [tm.userId, tm.status]));
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">{group.name}</h1>
+          {scope?.role === "ADMIN" ? (
+            <RenameGroupForm groupId={groupId} name={group.name} />
+          ) : (
+            <h1 className="text-2xl font-semibold text-foreground">{group.name}</h1>
+          )}
           <p className="text-sm text-muted-foreground">{members.length} member{members.length === 1 ? "" : "s"}</p>
         </div>
         <div className="flex gap-2">
@@ -66,18 +79,31 @@ export default async function GroupRosterPage({
                 <th className="px-4 py-2 font-medium">Name</th>
                 <th className="px-4 py-2 font-medium">Email</th>
                 <th className="px-4 py-2 font-medium">Course access</th>
+                <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-2 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {members.map((m) => (
-                <tr key={m.id}>
-                  <td className="px-4 py-3 text-foreground">{m.user.name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{m.user.email}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {m.user._count.enrollments + m.user._count.bundleEnrollments}
-                  </td>
-                </tr>
-              ))}
+              {members.map((m) => {
+                const status = statusByUserId.get(m.userId) ?? "ACTIVE";
+                return (
+                  <tr key={m.id}>
+                    <td className="px-4 py-3 text-foreground">{m.user.name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{m.user.email}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {m.user._count.enrollments + m.user._count.bundleEnrollments}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={status === "ACTIVE" ? "success" : "outline"}>
+                        {status === "REMOVED" ? "Paused" : status}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <MemberActions groupId={groupId} userId={m.userId} status={status} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

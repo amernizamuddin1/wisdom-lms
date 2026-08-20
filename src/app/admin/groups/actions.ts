@@ -47,6 +47,23 @@ export async function createGroup(
   redirect(`/admin/groups/${group.id}`);
 }
 
+export async function renameGroup(
+  groupId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Institution name is required." };
+
+  await prisma.group.update({ where: { id: groupId }, data: { name } });
+
+  revalidatePath("/admin/groups");
+  revalidatePath(`/admin/groups/${groupId}`);
+  return { success: true };
+}
+
 export async function archiveGroup(groupId: string): Promise<{ error?: string }> {
   await requireAdmin();
 

@@ -3,6 +3,7 @@ import { getBranding } from "@/lib/branding";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import AdminSidebar from "@/components/AdminSidebar";
+import AdminBreadcrumb from "@/components/AdminBreadcrumb";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default async function AdminDashboardLayout({
@@ -21,7 +22,7 @@ export default async function AdminDashboardLayout({
           <div className="flex items-center gap-2">
             <SidebarTrigger />
             <Separator orientation="vertical" className="h-4" />
-            <span className="text-sm font-medium text-foreground">{branding.adminPanelName}</span>
+            <AdminBreadcrumb />
           </div>
           <ThemeToggle />
         </header>

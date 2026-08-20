@@ -11,6 +11,71 @@ import type { Prisma } from "@/generated/prisma/client";
 
 export type SettingsActionState = { error?: string; success?: boolean };
 
+export type DeleteAccountState = { error?: string; result?: "purged" | "anonymized" };
+
+// Compliance (right-to-erasure) account deletion. User rows are global, not
+// tenant-scoped, so this deletes the person's entire account — an admin can
+// only target accounts connected to their own tenant (checked below), but
+// the deletion itself isn't limited to this tenant's data.
+export async function deleteUserAccount(
+  _prevState: DeleteAccountState,
+  formData: FormData,
+): Promise<DeleteAccountState> {
+  await requireAdmin();
+  const tenantId = await getTenantId();
+
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+
+  if (!email) return { error: "Email is required." };
+  if (confirmation !== "DELETE") return { error: 'Type "DELETE" to confirm.' };
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return { error: `No account found with the email "${email}".` };
+
+  const membership = await prisma.tenantMembership.findUnique({
+    where: { tenantId_userId: { tenantId, userId: user.id } },
+  });
+  if (!membership) {
+    return { error: "This account isn't associated with your institution/tenant." };
+  }
+
+  // Order.userId and EmailCampaign/Notification.createdById have no
+  // onDelete: Cascade (financial and audit records are never silently
+  // deleted) — a plain user.delete() throws an FK violation if any exist.
+  const [orderCount, campaignCount, notificationCount] = await Promise.all([
+    prisma.order.count({ where: { userId: user.id } }),
+    prisma.emailCampaign.count({ where: { createdById: user.id } }),
+    prisma.notification.count({ where: { createdById: user.id } }),
+  ]);
+  const isBlocked = orderCount > 0 || campaignCount > 0 || notificationCount > 0;
+
+  const supabase = createAdminClient();
+
+  if (!isBlocked) {
+    const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+    if (authError) return { error: `Failed to delete auth identity: ${authError.message}` };
+
+    await prisma.user.delete({ where: { id: user.id } });
+    return { result: "purged" };
+  }
+
+  const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+  if (authError) return { error: `Failed to delete auth identity: ${authError.message}` };
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      name: "Deleted User",
+      email: `deleted-${user.id}@deleted.invalid`,
+      phone: null,
+      profilePhotoUrl: null,
+    },
+  });
+
+  return { result: "anonymized" };
+}
+
 async function uploadBrandingAsset(file: File, prefix: string): Promise<string> {
   const supabase = createAdminClient();
   const ext = file.name.split(".").pop() || "png";

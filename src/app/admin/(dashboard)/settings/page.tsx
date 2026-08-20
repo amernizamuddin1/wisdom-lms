@@ -7,6 +7,7 @@ import LogoUploader from "./LogoUploader";
 import BrandingSettingsForm from "./BrandingSettingsForm";
 import IntegrationSettingsForm from "./IntegrationSettingsForm";
 import AnalyticsSettingsForm from "./AnalyticsSettingsForm";
+import DeleteAccountForm from "./DeleteAccountForm";
 
 export default async function AdminSettingsPage() {
   await requireAdmin();
@@ -42,6 +43,8 @@ export default async function AdminSettingsPage() {
         resendSenderEmail={settings?.resendSenderEmail ?? null}
         resendSenderName={settings?.resendSenderName ?? null}
       />
+
+      <DeleteAccountForm />
     </div>
   );
 }

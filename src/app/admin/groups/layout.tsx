@@ -4,6 +4,7 @@ import { getBranding } from "@/lib/branding";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import AdminSidebar from "@/components/AdminSidebar";
+import AdminBreadcrumb from "@/components/AdminBreadcrumb";
 import ThemeToggle from "@/components/ThemeToggle";
 import GroupsLogoutButton from "./GroupsLogoutButton";
 
@@ -30,7 +31,7 @@ export default async function GroupsLayout({ children }: { children: React.React
             <div className="flex items-center gap-2">
               <SidebarTrigger />
               <Separator orientation="vertical" className="h-4" />
-              <span className="text-sm font-medium text-foreground">{branding.adminPanelName}</span>
+              <AdminBreadcrumb />
             </div>
             <ThemeToggle />
           </header>
@@ -51,6 +52,9 @@ export default async function GroupsLayout({ children }: { children: React.React
           <GroupsLogoutButton />
         </div>
       </header>
+      <div className="mx-auto max-w-5xl px-4 pt-4 sm:px-6">
+        <AdminBreadcrumb />
+      </div>
       <main className="mx-auto max-w-5xl p-6">{children}</main>
     </div>
   );
