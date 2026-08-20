@@ -34,7 +34,7 @@ export default function CourseCard({
     <Link
       href={`/courses/${course.id}`}
       className={cn(
-        "group flex w-full flex-col overflow-hidden",
+        "group flex w-full flex-col overflow-hidden sm:rounded-lg",
         cardVariants({ variant: "course" }),
       )}
     >
