@@ -1,3 +1,4 @@
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CheckCircle2Icon } from "lucide-react";
@@ -6,6 +7,7 @@ import { getOptionalUser } from "@/lib/auth";
 import { getRazorpayCredentials } from "@/lib/settings";
 import { logCommerceEvent } from "@/lib/commerce-events";
 import { getBranding } from "@/lib/branding";
+import { getPublishedCourse } from "@/lib/public-data";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import PriceDisplay from "../../PriceDisplay";
@@ -24,61 +26,28 @@ const LEVEL_LABELS: Record<string, string> = {
   ALL_LEVELS: "All Levels",
 };
 
-async function getCourse(courseId: string) {
-  return prisma.course.findFirst({
-    where: { id: courseId, status: "PUBLISHED" },
-    select: {
-      id: true,
-      title: true,
-      shortDescription: true,
-      description: true,
-      isFree: true,
-      thumbnailUrl: true,
-      previewVideoUrl: true,
-      learningStatus: true,
-      level: true,
-      tags: true,
-      prerequisites: true,
-      learningObjectives: true,
-      outcomes: true,
-      targetAudience: true,
-      materialsIncluded: true,
-      durationMinutes: true,
-      certificateEnabled: true,
-      isPermanentAccess: true,
-      accessDurationMonths: true,
-      launchDate: true,
-      updatedAt: true,
-      prices: {
-        select: {
-          currency: true,
-          amount: true,
-          discountedPrice: true,
-          discountStartAt: true,
-          discountEndAt: true,
-          maxDiscountedEnrollments: true,
-          discountedEnrollmentsUsed: true,
-        },
-      },
-      instructors: {
-        orderBy: { order: "asc" },
-        select: { instructor: { select: { id: true, name: true, title: true, bio: true, avatarUrl: true } } },
-      },
-      chapters: {
-        orderBy: { order: "asc" },
-        select: {
-          id: true,
-          title: true,
-          lessons: {
-            orderBy: { order: "asc" },
-            select: { id: true, title: true, lessonType: true },
-          },
-          quizzes: { select: { id: true, title: true } },
-        },
-      },
-    },
-  });
-}
+type PublishedCourse = NonNullable<Awaited<ReturnType<typeof getPublishedCourse>>>;
+
+const getCourseCommerceState = cache(async function getCourseCommerceState(courseId: string) {
+  const user = await getOptionalUser();
+  const [enrollment, enrolledCount, razorpayCreds] = await Promise.all([
+    user
+      ? prisma.enrollment.findUnique({
+          where: { userId_courseId: { userId: user.id, courseId } },
+          select: { status: true },
+        })
+      : Promise.resolve(null),
+    prisma.enrollment.count({ where: { courseId, status: "ACTIVE" } }),
+    getRazorpayCredentials(),
+  ]);
+
+  return {
+    user,
+    enrolledCount,
+    isEnrolled: enrollment?.status === "ACTIVE",
+    razorpayConfigured: razorpayCreds !== null,
+  };
+});
 
 export async function generateMetadata({
   params,
@@ -87,10 +56,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { courseId } = await params;
   const [course, branding] = await Promise.all([
-    prisma.course.findFirst({
-      where: { id: courseId, status: "PUBLISHED" },
-      select: { title: true, shortDescription: true, description: true, thumbnailUrl: true },
-    }),
+    getPublishedCourse(courseId),
     getBranding(),
   ]);
 
@@ -115,39 +81,9 @@ export default async function CourseDetailPage({
   params: Promise<{ courseId: string }>;
 }) {
   const { courseId } = await params;
-  const [course, user, razorpayCreds] = await Promise.all([
-    getCourse(courseId),
-    getOptionalUser(),
-    getRazorpayCredentials(),
-  ]);
+  const course = await getPublishedCourse(courseId);
 
   if (!course) notFound();
-
-  if (user) logCommerceEvent({ userId: user.id, type: "PRODUCT_VIEWED", courseId: course.id });
-
-  const [enrollment, enrolledCount] = await Promise.all([
-    user
-      ? prisma.enrollment.findUnique({
-          where: { userId_courseId: { userId: user.id, courseId } },
-          select: { status: true },
-        })
-      : Promise.resolve(null),
-    prisma.enrollment.count({ where: { courseId, status: "ACTIVE" } }),
-  ]);
-  const isEnrolled = enrollment?.status === "ACTIVE";
-
-  const allLessonIds = course.chapters.flatMap((c) => c.lessons.map((l) => l.id));
-  const completedLessonIds =
-    isEnrolled && user && allLessonIds.length > 0
-      ? new Set(
-          (
-            await prisma.lessonProgress.findMany({
-              where: { userId: user.id, lessonId: { in: allLessonIds }, completedAt: { not: null } },
-              select: { lessonId: true },
-            })
-          ).map((p) => p.lessonId),
-        )
-      : new Set<string>();
 
   const totalLessons = course.chapters.reduce((n, c) => n + c.lessons.length, 0);
   const totalQuizzes = course.chapters.reduce((n, c) => n + c.quizzes.length, 0);
@@ -215,11 +151,9 @@ export default async function CourseDetailPage({
             {course.chapters.length} chapters &middot; {totalLessons} lessons
             {totalQuizzes > 0 && <> &middot; {totalQuizzes} quizzes</>}
           </p>
-          <CourseCurriculum
-            chapters={course.chapters}
-            isEnrolled={isEnrolled}
-            completedLessonIds={completedLessonIds}
-          />
+          <Suspense fallback={<div className="h-40 animate-pulse rounded-xl bg-muted" />}>
+            <PersonalizedCourseCurriculum course={course} />
+          </Suspense>
         </section>
       </div>
 
@@ -227,23 +161,9 @@ export default async function CourseDetailPage({
         <Card>
           <CardContent className="space-y-4">
             <PriceDisplay isFree={course.isFree} prices={course.prices} />
-            <EnrollSection
-              courseId={course.id}
-              isFree={course.isFree}
-              isLoggedIn={Boolean(user)}
-              isEnrolled={isEnrolled}
-              razorpayConfigured={razorpayCreds !== null}
-            />
-
-            <CourseMetaList
-              level={course.level}
-              enrolledCount={enrolledCount}
-              durationMinutes={course.durationMinutes}
-              updatedAt={course.updatedAt}
-              certificateEnabled={course.certificateEnabled}
-              isPermanentAccess={course.isPermanentAccess}
-              accessDurationMonths={course.accessDurationMonths}
-            />
+            <Suspense fallback={<CourseCommerceFallback />}>
+              <CourseCommerceControls course={course} />
+            </Suspense>
 
             <CourseInstructors instructors={instructors} />
 
@@ -267,6 +187,82 @@ export default async function CourseDetailPage({
           </CardContent>
         </Card>
       </aside>
+      <Suspense fallback={null}>
+        <CourseViewLogger courseId={course.id} />
+      </Suspense>
     </div>
   );
+}
+
+async function PersonalizedCourseCurriculum({ course }: { course: PublishedCourse }) {
+  const { user, isEnrolled } = await getCourseCommerceState(course.id);
+  const allLessonIds = course.chapters.flatMap((chapter) =>
+    chapter.lessons.map((lesson) => lesson.id),
+  );
+  const completedLessonIds =
+    isEnrolled && user && allLessonIds.length > 0
+      ? new Set(
+          (
+            await prisma.lessonProgress.findMany({
+              where: {
+                userId: user.id,
+                lessonId: { in: allLessonIds },
+                completedAt: { not: null },
+              },
+              select: { lessonId: true },
+            })
+          ).map((progress) => progress.lessonId),
+        )
+      : new Set<string>();
+
+  return (
+    <CourseCurriculum
+      chapters={course.chapters}
+      isEnrolled={isEnrolled}
+      completedLessonIds={completedLessonIds}
+    />
+  );
+}
+
+async function CourseCommerceControls({ course }: { course: PublishedCourse }) {
+  const { user, isEnrolled, enrolledCount, razorpayConfigured } =
+    await getCourseCommerceState(course.id);
+
+  return (
+    <>
+      <EnrollSection
+        courseId={course.id}
+        isFree={course.isFree}
+        isLoggedIn={Boolean(user)}
+        isEnrolled={isEnrolled}
+        razorpayConfigured={razorpayConfigured}
+      />
+      <CourseMetaList
+        level={course.level}
+        enrolledCount={enrolledCount}
+        durationMinutes={course.durationMinutes}
+        updatedAt={course.updatedAt}
+        certificateEnabled={course.certificateEnabled}
+        isPermanentAccess={course.isPermanentAccess}
+        accessDurationMonths={course.accessDurationMonths}
+      />
+    </>
+  );
+}
+
+function CourseCommerceFallback() {
+  return (
+    <div className="space-y-3" aria-label="Loading enrollment options">
+      <div className="h-10 animate-pulse rounded-md bg-muted" />
+      <div className="h-28 animate-pulse rounded-md bg-muted" />
+    </div>
+  );
+}
+
+async function CourseViewLogger({ courseId }: { courseId: string }) {
+  const user = await getOptionalUser();
+  if (user) {
+    logCommerceEvent({ userId: user.id, type: "PRODUCT_VIEWED", courseId });
+  }
+  return null;
 }

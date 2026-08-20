@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
 import { getBranding } from "@/lib/branding";
+import { getActiveBundleCatalog } from "@/lib/public-data";
 import BundleCard from "../BundleCard";
 import CatalogFilters from "../CatalogFilters";
 
@@ -19,41 +19,7 @@ export default async function BundlesCatalogPage({
 }) {
   const { q, price, tag } = await searchParams;
 
-  const [bundles, activeBundles] = await Promise.all([
-    prisma.courseBundle.findMany({
-      where: {
-        status: "ACTIVE",
-        ...(q ? { name: { contains: q, mode: "insensitive" as const } } : {}),
-        ...(tag && tag !== "all" ? { tags: { has: tag } } : {}),
-        ...(price === "free" ? { isFree: true } : {}),
-        ...(price === "paid" ? { isFree: false } : {}),
-      },
-      orderBy: { createdAt: "desc" },
-      select: {
-        slug: true,
-        name: true,
-        shortDescription: true,
-        thumbnailUrl: true,
-        isFree: true,
-        tags: true,
-        prices: {
-          select: {
-            currency: true,
-            amount: true,
-            discountedPrice: true,
-            discountStartAt: true,
-            discountEndAt: true,
-            maxDiscountedEnrollments: true,
-            discountedEnrollmentsUsed: true,
-          },
-        },
-        _count: { select: { courses: true } },
-      },
-    }),
-    prisma.courseBundle.findMany({ where: { status: "ACTIVE" }, select: { tags: true } }),
-  ]);
-
-  const allTags = Array.from(new Set(activeBundles.flatMap((b) => b.tags))).sort();
+  const { bundles, tags: allTags } = await getActiveBundleCatalog({ q, price, tag });
 
   return (
     <div className="mx-auto max-w-(--content-width) px-4 py-10 sm:px-6">
@@ -77,10 +43,11 @@ export default async function BundlesCatalogPage({
         <p className="text-muted-foreground">No bundles match your filters.</p>
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {bundles.map((bundle) => (
+          {bundles.map((bundle, index) => (
             <BundleCard
               key={bundle.slug}
               bundle={{ ...bundle, courseCount: bundle._count.courses }}
+              preloadImage={index === 0}
             />
           ))}
         </div>

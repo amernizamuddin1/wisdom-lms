@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant-context";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { invalidatePublicBundleCache } from "@/lib/public-cache";
 import { COURSE_ASSETS_BUCKET, buildBundleThumbnailPath, describeStorageError, validateUpload } from "@/lib/storage/paths";
 import { parseDecimal, splitCommaList, parseDate, parseDiscountFields } from "@/lib/form-parsing";
 import type { DurationChoice } from "@/lib/access";
@@ -83,6 +84,7 @@ export async function createBundle(
     throw e;
   }
 
+  await invalidatePublicBundleCache();
   redirect(`/admin/bundles/${bundle.id}`);
 }
 
@@ -167,6 +169,7 @@ export async function upsertBundlePrices(
     await prisma.bundlePrice.deleteMany({ where: { bundleId, currency: "EUR" } });
   }
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return { success: true };
 }
@@ -203,6 +206,7 @@ export async function updateBundleAccessPolicy(
     });
   }
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return { success: true };
 }
@@ -221,6 +225,7 @@ export async function setBundleStatus(
   }
 
   await prisma.courseBundle.update({ where: { id: bundleId }, data: { status } });
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   revalidatePath("/admin/bundles");
   return {};
@@ -237,6 +242,7 @@ export async function deleteBundle(bundleId: string): Promise<{ error?: string }
   }
 
   await prisma.courseBundle.delete({ where: { id: bundleId } });
+  await invalidatePublicBundleCache();
   revalidatePath("/admin/bundles");
   redirect("/admin/bundles");
 }
@@ -265,6 +271,7 @@ export async function addCourseToBundle(
     await backfillNewBundleCourse(tx, { bundleId, courseId });
   });
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return {};
 }
@@ -289,6 +296,7 @@ export async function removeCourseFromBundle(
     where: { bundleId_courseId: { bundleId, courseId } },
   });
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return {};
 }
@@ -323,6 +331,7 @@ export async function assignBundleToLearner(
     await grantBundleAccess(tx, { userId: user.id, bundleId, startAt });
   });
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return { success: true };
 }
@@ -370,6 +379,7 @@ export async function uploadBundleThumbnail(
     data: { thumbnailUrl: data.publicUrl },
   });
 
+  await invalidatePublicBundleCache();
   revalidatePath(`/admin/bundles/${bundleId}`);
   return { success: true };
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicBrandingCache } from "@/lib/public-cache";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTenantId } from "@/lib/tenant-context";
@@ -67,6 +68,7 @@ export async function saveBrandingSettings(
     update: data,
   });
 
+  await invalidatePublicBrandingCache();
   revalidatePath("/", "layout");
   return { success: true };
 }
@@ -103,6 +105,7 @@ export async function uploadLogo(
     update: { logoUrl: data.publicUrl },
   });
 
+  await invalidatePublicBrandingCache();
   revalidatePath("/admin/settings");
   return { success: true };
 }

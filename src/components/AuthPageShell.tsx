@@ -85,7 +85,7 @@ export default function AuthPageShell({
         />
       </div>
 
-      <div className="relative w-full max-w-[420px] motion-safe:animate-[login-card-in_500ms_ease-out]">
+      <div className="relative w-full max-w-[420px]">
         <div className="rounded-2xl border border-[rgba(15,23,42,0.08)] bg-[rgba(255,255,255,0.90)] p-8 shadow-[0_8px_30px_rgba(15,23,42,0.06)] dark:border-white/[0.08] dark:bg-[#171820] dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
           <div className="flex flex-col items-center text-center">
             <div className="mb-5 flex size-12 items-center justify-center rounded-2xl border border-[var(--auth-icon-border)] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-[var(--auth-icon-border-dark)] dark:bg-[#1D1E29] dark:shadow-[0_0_20px_var(--auth-icon-glow-dark)]">

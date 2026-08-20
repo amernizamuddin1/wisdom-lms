@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getLevelProgress } from "@/lib/gamification/levels";
-import { getNextMilestone } from "@/lib/gamification/next-milestone";
+import { computeLevelProgress } from "@/lib/gamification/levels-pure";
+import { getDateKeyForUser } from "@/lib/gamification/timezone";
 import { formatNumber } from "@/lib/gamification/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,18 +12,40 @@ import BadgeImage from "./BadgeImage";
 // is intentionally omitted here — the leaderboard is a later-phase feature,
 // and showing a fake rank would violate the no-mock-data requirement.
 export default async function GamificationSummaryWidget({ userId }: { userId: string }) {
-  const [profile, mostRecentBadge, nextMilestone] = await Promise.all([
+  const [profile, mostRecentBadge, user, levels] = await Promise.all([
     prisma.userGamificationProfile.findUnique({ where: { userId } }),
     prisma.userAchievement.findFirst({
       where: { userId },
       orderBy: { earnedAt: "desc" },
       include: { achievement: true },
     }),
-    getNextMilestone(userId),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { timezone: true } }),
+    prisma.gamificationLevel.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+    }),
   ]);
 
   const totalXp = profile?.totalXp ?? 0;
-  const levelProgress = await getLevelProgress(prisma, totalXp);
+  const levelProgress = computeLevelProgress(levels, totalXp);
+  let nextMilestone = "Keep going — your next achievement is closer than you think.";
+
+  if (levelProgress?.nextLevel && levelProgress.xpForNextLevel != null) {
+    const xpRemaining = levelProgress.xpForNextLevel - levelProgress.xpIntoLevel;
+    if (xpRemaining > 0 && xpRemaining <= 200) {
+      nextMilestone = `Earn ${xpRemaining} more XP to reach ${levelProgress.nextLevel.name}.`;
+    }
+  }
+
+  if (nextMilestone.startsWith("Keep going")) {
+    const todayKey = getDateKeyForUser(new Date(), user.timezone);
+    if (profile?.lastQualifyingDate !== todayKey) {
+      nextMilestone =
+        profile && profile.currentStreak > 0
+          ? "Learn today to keep your streak alive."
+          : "Complete a lesson today to start your learning streak.";
+    }
+  }
 
   return (
     <Card variant="subtle">

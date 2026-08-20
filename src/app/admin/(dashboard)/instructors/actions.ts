@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant-context";
 import { prisma } from "@/lib/prisma";
+import { invalidatePublicCourseCache } from "@/lib/public-cache";
 
 export type ActionState = { error?: string; success?: boolean };
 
@@ -63,6 +64,7 @@ export async function updateInstructor(
     },
   });
 
+  await invalidatePublicCourseCache();
   revalidatePath("/admin/instructors");
   revalidatePath("/admin/courses");
   return { success: true };
@@ -71,6 +73,7 @@ export async function updateInstructor(
 export async function deleteInstructor(instructorId: string): Promise<ActionState> {
   await requireAdmin();
   await prisma.instructor.delete({ where: { id: instructorId } });
+  await invalidatePublicCourseCache();
   revalidatePath("/admin/instructors");
   revalidatePath("/admin/courses");
   return { success: true };

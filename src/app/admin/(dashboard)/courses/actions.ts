@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant-context";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { invalidatePublicCourseCache } from "@/lib/public-cache";
 import { COURSE_ASSETS_BUCKET, buildCourseThumbnailPath, describeStorageError, validateUpload } from "@/lib/storage/paths";
 import { touchCourseUpdatedAt } from "@/lib/course-content";
 import {
@@ -73,6 +74,7 @@ export async function createCourse(
     },
   });
 
+  await invalidatePublicCourseCache();
   redirect(`/admin/courses/${course.id}`);
 }
 
@@ -105,6 +107,7 @@ export async function updateCourseDetails(
     },
   });
 
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   return { success: true };
 }
@@ -127,6 +130,7 @@ export async function updateCourseLearningDetails(
     },
   });
 
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   return { success: true };
 }
@@ -143,6 +147,7 @@ export async function updateCourseLaunchDate(
     data: { launchDate: parseDate(formData.get("launchDate")) },
   });
 
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   return { success: true };
 }
@@ -164,6 +169,7 @@ export async function updateCoursePreviewVideo(
     },
   });
 
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   return { success: true };
 }
@@ -211,6 +217,7 @@ export async function updateCourseMeta(
     },
   });
 
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   return { success: true };
 }
@@ -229,6 +236,7 @@ export async function assignCourseInstructors(
     }),
   ]);
 
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   return { success: true };
 }
@@ -279,6 +287,7 @@ export async function upsertCoursePrices(
     await prisma.coursePrice.deleteMany({ where: { courseId, currency: "EUR" } });
   }
 
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   return { success: true };
 }
@@ -286,6 +295,7 @@ export async function upsertCoursePrices(
 export async function setCourseLearningStatus(courseId: string, learningStatus: "ACTIVE" | "PAUSED") {
   await requireAdmin();
   await prisma.course.update({ where: { id: courseId }, data: { learningStatus } });
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   revalidatePath("/admin/courses");
 }
@@ -293,6 +303,7 @@ export async function setCourseLearningStatus(courseId: string, learningStatus: 
 export async function setCourseStatus(courseId: string, status: "DRAFT" | "PUBLISHED") {
   await requireAdmin();
   await prisma.course.update({ where: { id: courseId }, data: { status } });
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   revalidatePath("/admin/courses");
 }
@@ -434,6 +445,7 @@ export async function duplicateCourse(courseId: string) {
     },
   });
 
+  await invalidatePublicCourseCache();
   revalidatePath("/admin/courses");
   redirect(`/admin/courses/${newCourse.id}`);
 }
@@ -441,6 +453,7 @@ export async function duplicateCourse(courseId: string) {
 export async function deleteCourse(courseId: string) {
   await requireAdmin();
   await prisma.course.delete({ where: { id: courseId } });
+  await invalidatePublicCourseCache();
   revalidatePath("/admin/courses");
   redirect("/admin/courses");
 }
@@ -458,6 +471,7 @@ export async function reorderChapters(courseId: string, orderedIds: string[]) {
   );
 
   await touchCourseUpdatedAt(courseId);
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
 }
 
@@ -506,6 +520,7 @@ export async function uploadThumbnail(
     data: { thumbnailUrl: data.publicUrl },
   });
 
+  await invalidatePublicCourseCache();
   revalidatePath(`/admin/courses/${courseId}`);
   return { success: true };
 }

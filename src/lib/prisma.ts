@@ -8,7 +8,15 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: ReturnType<typeof createScopedClient>;
 };
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+// Vercel may keep several function instances warm at once. Keep each
+// instance to a small pool so the aggregate stays well within Supabase's
+// transaction-pool capacity without serializing every dashboard query. The
+// node-postgres default of ten connections per function instance is too high
+// for serverless fan-out.
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+  max: 3,
+});
 
 const base = globalForPrisma.prismaBase ?? new PrismaClient({ adapter });
 

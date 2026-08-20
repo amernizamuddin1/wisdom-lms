@@ -1,18 +1,15 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { GraduationCapIcon, ShoppingCartIcon } from "lucide-react";
-import { getOptionalUser } from "@/lib/auth";
+import { GraduationCapIcon } from "lucide-react";
 import { getBranding } from "@/lib/branding";
-import { getCartItemCount } from "@/lib/cart";
 import { getOptionalTenantContext } from "@/lib/tenant-context";
 import { WISDOMQUANT_SITE_URL, WISDOMQUANT_TENANT_SLUG } from "@/lib/tenant-theme";
-import { Button } from "@/components/ui/button";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
-  NotificationBellFallback,
-  NotificationBellServer,
-} from "@/components/NotificationBellServer";
+  default as PublicUserControls,
+  PublicUserControlsFallback,
+} from "@/components/PublicUserControls";
 import PublicMobileNav from "./PublicMobileNav";
 
 export default async function PublicLayout({
@@ -20,13 +17,8 @@ export default async function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [user, branding, tenant] = await Promise.all([
-    getOptionalUser(),
-    getBranding(),
-    getOptionalTenantContext(),
-  ]);
+  const [branding, tenant] = await Promise.all([getBranding(), getOptionalTenantContext()]);
   const isWisdomQuant = tenant?.tenantSlug === WISDOMQUANT_TENANT_SLUG;
-  const cartItemCount = user ? await getCartItemCount(user.id) : 0;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -75,30 +67,9 @@ export default async function PublicLayout({
             </Link>
             <PublicMobileNav isWisdomQuant={isWisdomQuant} wisdomQuantSiteUrl={WISDOMQUANT_SITE_URL} />
             <ThemeToggle />
-            {user ? (
-              <>
-                <Suspense fallback={<NotificationBellFallback />}>
-                  <NotificationBellServer userId={user.id} />
-                </Suspense>
-                <Button asChild size="icon" variant="outline" className="relative">
-                  <Link href="/cart" aria-label={`Cart${cartItemCount > 0 ? ` (${cartItemCount} items)` : ""}`}>
-                    <ShoppingCartIcon className="size-4" />
-                    {cartItemCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-white">
-                        {cartItemCount > 9 ? "9+" : cartItemCount}
-                      </span>
-                    )}
-                  </Link>
-                </Button>
-                <Button asChild size="sm">
-                  <Link href="/dashboard">My Dashboard</Link>
-                </Button>
-              </>
-            ) : (
-              <Button asChild size="sm" variant="outline">
-                <Link href="/login">Log In</Link>
-              </Button>
-            )}
+            <Suspense fallback={<PublicUserControlsFallback />}>
+              <PublicUserControls />
+            </Suspense>
           </nav>
         </div>
       </header>

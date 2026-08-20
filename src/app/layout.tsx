@@ -3,6 +3,7 @@ import { Inter, Poppins } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import AppToaster from "@/components/AppToaster";
 import { BrandingProvider } from "@/components/BrandingProvider";
+import WebVitalsReporter from "@/components/WebVitalsReporter";
 import { getBranding } from "@/lib/branding";
 import { getOptionalTenantContext } from "@/lib/tenant-context";
 import { WISDOMQUANT_TENANT_SLUG, wisdomQuantThemeCss } from "@/lib/tenant-theme";
@@ -11,7 +12,6 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
 });
 
 // Only loaded/served for the WisdomQuant tenant (see wisdomQuantThemeCss
@@ -21,6 +21,8 @@ const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  display: "swap",
+  preload: false,
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -66,6 +68,7 @@ export default async function RootLayout({
           <BrandingProvider branding={branding}>
             {children}
             <AppToaster />
+            <WebVitalsReporter />
           </BrandingProvider>
         </ThemeProvider>
       </body>
