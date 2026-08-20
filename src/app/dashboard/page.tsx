@@ -32,13 +32,13 @@ export default async function MyCoursesPage({
   });
 
   const firstName = user.name.trim().split(/\s+/)[0];
-  const heading = groupMembership
-    ? `Hello, ${firstName} | ${groupMembership.group.name} | Available Courses`
-    : `Hello, ${firstName} | Available Courses`;
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-foreground">{heading}</h2>
+      <h2 className="text-xl text-foreground">
+        <span className="font-semibold">Hello, {firstName}</span>
+        {groupMembership ? ` | ${groupMembership.group.name}` : " | Available Courses"}
+      </h2>
 
       <Suspense
         fallback={
