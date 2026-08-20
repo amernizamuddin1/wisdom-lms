@@ -5,6 +5,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import StudentSidebar from "@/components/StudentSidebar";
+import StudentBreadcrumb from "@/components/StudentBreadcrumb";
 import ThemeToggle from "@/components/ThemeToggle";
 import UnlockWatcher from "@/components/gamification/UnlockWatcher";
 
@@ -44,7 +45,7 @@ export default function DashboardChrome({
           <div className="flex items-center gap-2">
             <SidebarTrigger className="md:hidden" />
             <Separator orientation="vertical" className="h-4 md:hidden" />
-            <span className="text-sm font-medium text-foreground">{platformName}</span>
+            <StudentBreadcrumb />
           </div>
           <div className="flex items-center gap-2">
             {notificationBell}
