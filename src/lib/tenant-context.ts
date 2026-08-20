@@ -1,5 +1,6 @@
 import "server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { cache } from "react";
 import { headers } from "next/headers";
 
 export interface TenantContext {
@@ -30,7 +31,7 @@ export function runWithTenantContext<T>(context: TenantContext, fn: () => T): T 
 // Throws instead of silently falling back to "no tenant" — a query that runs
 // outside a resolved request (e.g. a script that forgot to set context) must
 // fail loudly rather than risk leaking cross-tenant data.
-export async function getTenantContext(): Promise<TenantContext> {
+export const getTenantContext = cache(async function getTenantContext(): Promise<TenantContext> {
   const override = overrideStorage.getStore();
   if (override) return override;
 
@@ -45,9 +46,9 @@ export async function getTenantContext(): Promise<TenantContext> {
     );
   }
   return { tenantId, tenantSlug };
-}
+});
 
-export async function getOptionalTenantContext(): Promise<TenantContext | null> {
+export const getOptionalTenantContext = cache(async function getOptionalTenantContext(): Promise<TenantContext | null> {
   const override = overrideStorage.getStore();
   if (override) return override;
 
@@ -56,7 +57,7 @@ export async function getOptionalTenantContext(): Promise<TenantContext | null> 
   const tenantSlug = h.get("x-tenant-slug");
   if (!tenantId || !tenantSlug) return null;
   return { tenantId, tenantSlug };
-}
+});
 
 export async function getTenantId(): Promise<string> {
   return (await getTenantContext()).tenantId;

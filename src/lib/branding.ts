@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { getTenantId } from "@/lib/tenant-context";
 
@@ -19,7 +20,7 @@ export const BRANDING_DEFAULTS = {
 
 export type Branding = typeof BRANDING_DEFAULTS;
 
-export async function getBranding(): Promise<Branding> {
+export const getBranding = cache(async function getBranding(): Promise<Branding> {
   const tenantId = await getTenantId();
   const settings = await prisma.settings.findUnique({ where: { tenantId } });
 
@@ -34,4 +35,4 @@ export async function getBranding(): Promise<Branding> {
     supportEmail: settings?.supportEmail ?? BRANDING_DEFAULTS.supportEmail,
     footerText: settings?.footerText ?? BRANDING_DEFAULTS.footerText,
   };
-}
+});
