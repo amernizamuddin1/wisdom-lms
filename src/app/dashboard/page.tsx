@@ -211,7 +211,7 @@ async function CoursesSection({
                         fill
                         sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                         quality={60}
-                        className="object-contain transition-transform duration-[350ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] motion-safe:group-hover:scale-[1.04]"
+                        className="object-cover transition-transform duration-[350ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] motion-safe:group-hover:scale-[1.04]"
                         {...(index === 0 ? { preload: true } : { loading: "lazy" as const })}
                       />
                     ) : (
