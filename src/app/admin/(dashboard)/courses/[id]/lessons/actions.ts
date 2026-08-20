@@ -5,6 +5,13 @@ import { requireAdmin } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant-context";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  LESSON_FILES_BUCKET,
+  buildLessonAudioPath,
+  buildLessonFilePath,
+  describeStorageError,
+  validateUpload,
+} from "@/lib/storage/paths";
 import { detectVideoSource } from "@/lib/video";
 import { sanitizeLessonHtml } from "@/lib/sanitize";
 import { touchCourseUpdatedAt } from "@/lib/course-content";
@@ -98,20 +105,31 @@ export async function uploadLessonFile(
   await requireAdmin();
   const tenantId = await getTenantId();
 
+  try {
+    await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } });
+  } catch {
+    return { error: "Lesson not found." };
+  }
+
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Choose a file." };
   }
 
+  const validation = validateUpload(file, { allowedPrefix: "", maxBytes: 50 * 1024 * 1024 });
+  if (!validation.ok) {
+    return { error: validation.error };
+  }
+
   const supabase = createAdminClient();
-  const path = `${lessonId}/${Date.now()}-${file.name}`;
+  const path = buildLessonFilePath(tenantId, lessonId, file.name);
 
   const { error: uploadError } = await supabase.storage
-    .from("lesson-files")
+    .from(LESSON_FILES_BUCKET)
     .upload(path, file, { contentType: file.type });
 
   if (uploadError) {
-    return { error: `Upload failed: ${uploadError.message}` };
+    return { error: describeStorageError(uploadError) };
   }
 
   const created = await prisma.lessonFile.create({
@@ -129,24 +147,36 @@ export async function uploadLessonAudio(
   formData: FormData,
 ): Promise<UploadAudioState> {
   await requireAdmin();
+  const tenantId = await getTenantId();
+
+  try {
+    await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } });
+  } catch {
+    return { error: "Lesson not found." };
+  }
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Choose an audio file." };
   }
 
+  const validation = validateUpload(file, { allowedPrefix: "audio/", maxBytes: 50 * 1024 * 1024 });
+  if (!validation.ok) {
+    return { error: validation.error };
+  }
+
   const supabase = createAdminClient();
-  const path = `${lessonId}/audio-${Date.now()}-${file.name}`;
+  const path = buildLessonAudioPath(tenantId, lessonId, file.name);
 
   const { error: uploadError } = await supabase.storage
-    .from("lesson-files")
+    .from(LESSON_FILES_BUCKET)
     .upload(path, file, { contentType: file.type });
 
   if (uploadError) {
-    return { error: `Upload failed: ${uploadError.message}` };
+    return { error: describeStorageError(uploadError) };
   }
 
-  const { data } = await supabase.storage.from("lesson-files").createSignedUrl(path, 600);
+  const { data } = await supabase.storage.from(LESSON_FILES_BUCKET).createSignedUrl(path, 600);
 
   return { path, previewUrl: data?.signedUrl };
 }
@@ -158,7 +188,7 @@ export async function deleteLessonFile(courseId: string, lessonId: string, fileI
   if (!file) return;
 
   const supabase = createAdminClient();
-  await supabase.storage.from("lesson-files").remove([file.fileUrl]);
+  await supabase.storage.from(LESSON_FILES_BUCKET).remove([file.fileUrl]);
 
   await prisma.lessonFile.delete({ where: { id: fileId } });
 

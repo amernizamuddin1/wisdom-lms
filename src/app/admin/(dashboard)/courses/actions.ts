@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant-context";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { COURSE_ASSETS_BUCKET, buildCourseThumbnailPath, describeStorageError, validateUpload } from "@/lib/storage/paths";
 import { touchCourseUpdatedAt } from "@/lib/course-content";
 import {
   parseDecimal,
@@ -466,25 +467,39 @@ export async function uploadThumbnail(
   formData: FormData,
 ): Promise<ActionState> {
   await requireAdmin();
+  const tenantId = await getTenantId();
+
+  // Tenant-scoped lookup: throws if courseId doesn't belong to this tenant,
+  // which stops a cross-tenant courseId before any storage write happens.
+  try {
+    await prisma.course.findUniqueOrThrow({ where: { id: courseId } });
+  } catch {
+    return { error: "Course not found." };
+  }
 
   const file = formData.get("thumbnail");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Choose an image file." };
   }
 
+  const validation = validateUpload(file, { allowedPrefix: "image/", maxBytes: 5 * 1024 * 1024 });
+  if (!validation.ok) {
+    return { error: validation.error };
+  }
+
   const supabase = createAdminClient();
   const ext = file.name.split(".").pop() || "jpg";
-  const path = `${courseId}/thumbnail-${Date.now()}.${ext}`;
+  const path = buildCourseThumbnailPath(tenantId, courseId, ext);
 
   const { error: uploadError } = await supabase.storage
-    .from("course-assets")
+    .from(COURSE_ASSETS_BUCKET)
     .upload(path, file, { upsert: true, contentType: file.type });
 
   if (uploadError) {
-    return { error: `Upload failed: ${uploadError.message}` };
+    return { error: describeStorageError(uploadError) };
   }
 
-  const { data } = supabase.storage.from("course-assets").getPublicUrl(path);
+  const { data } = supabase.storage.from(COURSE_ASSETS_BUCKET).getPublicUrl(path);
 
   await prisma.course.update({
     where: { id: courseId },
