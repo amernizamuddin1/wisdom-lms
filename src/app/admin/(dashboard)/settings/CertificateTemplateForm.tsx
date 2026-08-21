@@ -50,6 +50,12 @@ export default function CertificateTemplateForm({ hasTemplate }: { hasTemplate: 
           <code className="text-xs">{"{{certificateCode}}"}</code>. If no template is uploaded, a
           plain default certificate is used instead.
         </p>
+        <p className="text-sm text-muted-foreground">
+          Fonts and images must be embedded directly in the file (base64 data URIs), not linked to an
+          external URL (e.g. Google Fonts <code className="text-xs">@import</code>). PDF rendering runs
+          in a network-restricted sandbox — an external request that hangs or fails will silently fall
+          back to the plain default certificate instead of your template.
+        </p>
 
         {hasTemplate && !fileName && (
           <p className="text-sm text-foreground">A template is currently configured.</p>
