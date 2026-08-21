@@ -1,5 +1,5 @@
 import "server-only";
-import { Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import { fromZonedTime } from "date-fns-tz";
 import { getDateKeyForUser } from "./timezone";
 import { getTenantId } from "@/lib/tenant-context";
@@ -22,10 +22,6 @@ export type AwardXpParams = {
 
 export type AwardXpResult = { awarded: boolean; amount: number };
 
-function isUniqueConstraintError(e: unknown): boolean {
-  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
-}
-
 // Looks up a rule's current XP amount, respecting its active flag — the one
 // place every call site should read "how much is this rule worth right now"
 // from, so a future admin toggling a rule off (Phase 4) is honored uniformly.
@@ -47,8 +43,14 @@ async function isUnderDailyCap(tx: Tx, userId: string, ruleCode: string, cap: nu
 }
 
 // Dedupe-safe XP ledger write. Attempts the insert; if `dedupeKey` collides
-// with an existing entry for this user (P2002), the action has already been
-// awarded and this is a no-op re-trigger (e.g. reopening a completed lesson).
+// with an existing entry for this user, the action has already been awarded
+// and this is a no-op re-trigger (e.g. reopening a completed lesson). Checked
+// up front rather than caught off a failed insert: awardXp always runs inside
+// a caller's shared interactive transaction (recordLessonCompleted et al.),
+// and Postgres aborts the *entire* transaction after any failed statement —
+// catching the unique-violation in JS doesn't undo that, so every subsequent
+// query in the same transaction would fail with "current transaction is
+// aborted" even though the JS thought it handled the collision gracefully.
 // Respects the rule's active flag and daily cap, both read fresh so an admin
 // toggling a rule off (Phase 4) takes effect immediately.
 export async function awardXp(tx: Tx, params: AwardXpParams): Promise<AwardXpResult> {
@@ -62,25 +64,28 @@ export async function awardXp(tx: Tx, params: AwardXpParams): Promise<AwardXpRes
     if (!under) return { awarded: false, amount: 0 };
   }
 
-  try {
-    await tx.userXpTransaction.create({
-      data: {
-        userId: params.userId,
-        amount: params.amount,
-        reason: params.reason,
-        ruleCode: params.ruleCode,
-        dedupeKey: params.dedupeKey,
-        sourceEventId: params.sourceEventId,
-        relatedEntityType: params.relatedEntityType,
-        relatedEntityId: params.relatedEntityId,
-        metadataJson: params.metadata as Prisma.InputJsonValue | undefined,
-        tenantId,
-      },
+  if (params.dedupeKey) {
+    const existing = await tx.userXpTransaction.findUnique({
+      where: { userId_dedupeKey: { userId: params.userId, dedupeKey: params.dedupeKey } },
+      select: { id: true },
     });
-  } catch (e) {
-    if (isUniqueConstraintError(e)) return { awarded: false, amount: 0 };
-    throw e;
+    if (existing) return { awarded: false, amount: 0 };
   }
+
+  await tx.userXpTransaction.create({
+    data: {
+      userId: params.userId,
+      amount: params.amount,
+      reason: params.reason,
+      ruleCode: params.ruleCode,
+      dedupeKey: params.dedupeKey,
+      sourceEventId: params.sourceEventId,
+      relatedEntityType: params.relatedEntityType,
+      relatedEntityId: params.relatedEntityId,
+      metadataJson: params.metadata as Prisma.InputJsonValue | undefined,
+      tenantId,
+    },
+  });
 
   await tx.userGamificationProfile.upsert({
     where: { userId: params.userId },
