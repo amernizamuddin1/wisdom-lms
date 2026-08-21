@@ -192,8 +192,8 @@ model Tenant {
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
 
-  memberships TenantMembership[]
-  groups      Group[]
+  memberships      TenantMembership[]
+  groups           Group[]
   groupMemberships GroupMembership[]
 
   settings                  Settings?
@@ -402,12 +402,11 @@ model User {
 // encrypted integration keys. Always upserted against a fixed known id
 // ("main") rather than enforced at the DB level, since one deployment = one row.
 model Settings {
-  tenantId                      String  @id @map("tenant_id")
-  tenant                        Tenant  @relation(fields: [tenantId], references: [id])
-  logoUrl                       String? @map("logo_url")
-  faviconUrl                    String? @map("favicon_url")
-  certificateTemplateUrl        String? @map("certificate_template_url")
-  certificateFieldPositionsJson Json?   @map("certificate_field_positions_json")
+  tenantId                String  @id @map("tenant_id")
+  tenant                  Tenant  @relation(fields: [tenantId], references: [id])
+  logoUrl                 String? @map("logo_url")
+  faviconUrl              String? @map("favicon_url")
+  certificateTemplateHtml String? @map("certificate_template_html") @db.Text
 
   platformName     String? @map("platform_name")
   shortName        String? @map("short_name")

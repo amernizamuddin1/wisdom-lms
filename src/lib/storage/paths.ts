@@ -39,6 +39,15 @@ export function buildLessonAudioPath(tenantId: string, lessonId: string, fileNam
   return `tenants/${tenantId}/lessons/${lessonId}/audio-${Date.now()}-${sanitizeFileName(fileName)}`;
 }
 
+export function buildCertificatePath(
+  tenantId: string,
+  userId: string,
+  courseId: string,
+  certificateCode: string,
+): string {
+  return `tenants/${tenantId}/certificates/${userId}/${courseId}-${certificateCode}.pdf`;
+}
+
 export interface UploadValidationOptions {
   allowedPrefix: string; // e.g. "image/" or "audio/"
   maxBytes: number;

@@ -5,6 +5,7 @@ import { getAnalyticsSettings } from "@/lib/analytics/settings";
 import { getTenantId } from "@/lib/tenant-context";
 import LogoUploader from "./LogoUploader";
 import BrandingSettingsForm from "./BrandingSettingsForm";
+import CertificateTemplateForm from "./CertificateTemplateForm";
 import IntegrationSettingsForm from "./IntegrationSettingsForm";
 import AnalyticsSettingsForm from "./AnalyticsSettingsForm";
 import DeleteAccountForm from "./DeleteAccountForm";
@@ -32,6 +33,8 @@ export default async function AdminSettingsPage() {
       <LogoUploader logoUrl={settings?.logoUrl ?? null} />
 
       <BrandingSettingsForm branding={branding} faviconUrl={settings?.faviconUrl ?? null} />
+
+      <CertificateTemplateForm hasTemplate={Boolean(settings?.certificateTemplateHtml)} />
 
       <AnalyticsSettingsForm settings={analyticsSettings} />
 

@@ -5,16 +5,23 @@ import type { Prisma } from "@/generated/prisma/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { awardXp, getRuleXpAmount } from "./xp";
 import { getTenantId } from "@/lib/tenant-context";
+import { renderCertificateHtml } from "./certificate-tokens";
+import { renderPdfFromHtml } from "./certificate-pdf";
+import { CERTIFICATES_BUCKET, buildCertificatePath } from "@/lib/storage/paths";
+import { sendMail } from "@/lib/email";
+import { wrapEmailHtml } from "@/lib/email-templates/layout";
+import { getBranding } from "@/lib/branding";
 
 import type { PrismaTransaction } from "@/lib/prisma";
 
 type Tx = PrismaTransaction;
 
-// Minimal, unbranded certificate PDF — generated so CERTIFICATE_EARNED and
-// the "Certificates earned" analytics metric are real and non-zero. This is
-// deliberately not the full Canva-template-positioning pipeline reserved by
-// Settings.certificateTemplateUrl/certificateFieldPositionsJson, which
-// remains separate future work.
+// Minimal, unbranded certificate PDF — the fallback used when a tenant
+// hasn't configured Settings.certificateTemplateHtml yet, or when rendering
+// their uploaded template throws (see maybeIssueCertificate below). Ensures
+// CERTIFICATE_EARNED and the "Certificates earned" analytics metric are
+// always real and non-zero, and that a broken/missing admin template never
+// blocks a student from getting a certificate.
 async function generateCertificatePdf(params: {
   learnerName: string;
   courseTitle: string;
@@ -81,28 +88,58 @@ export async function maybeIssueCertificate(
   });
   if (existing) return { issued: false };
 
-  const [user, course] = await Promise.all([
+  const [user, course, settings] = await Promise.all([
     tx.user.findUniqueOrThrow({ where: { id: params.userId } }),
     tx.course.findUniqueOrThrow({ where: { id: params.courseId } }),
+    tx.settings.findUnique({ where: { tenantId } }),
   ]);
 
   const certificateCode = `WQ-${randomUUID().slice(0, 8).toUpperCase()}`;
   const issuedAt = new Date();
-  const pdfBytes = await generateCertificatePdf({
-    learnerName: user.name,
-    courseTitle: course.title,
-    issuedAt,
-    certificateCode,
-  });
+
+  const fallbackPdf = () =>
+    generateCertificatePdf({
+      learnerName: user.name,
+      courseTitle: course.title,
+      issuedAt,
+      certificateCode,
+    });
+
+  let pdfBytes: Uint8Array;
+  if (settings?.certificateTemplateHtml) {
+    try {
+      pdfBytes = await renderPdfFromHtml(
+        renderCertificateHtml(settings.certificateTemplateHtml, {
+          studentName: user.name,
+          courseTitle: course.title,
+          completionDate: issuedAt.toLocaleDateString(),
+          certificateCode,
+        }),
+      );
+    } catch (renderError) {
+      console.error("Certificate template render failed, falling back to plain certificate", renderError);
+      pdfBytes = await fallbackPdf();
+      await notifyAdminOfRenderFailure({
+        tenantId,
+        supportEmail: settings.supportEmail,
+        user,
+        course,
+        certificateCode,
+        error: renderError,
+      });
+    }
+  } else {
+    pdfBytes = await fallbackPdf();
+  }
 
   const supabase = createAdminClient();
-  const path = `${params.userId}/${params.courseId}-${certificateCode}.pdf`;
+  const path = buildCertificatePath(tenantId, params.userId, params.courseId, certificateCode);
   const { error: uploadError } = await supabase.storage
-    .from("certificates")
+    .from(CERTIFICATES_BUCKET)
     .upload(path, Buffer.from(pdfBytes), { contentType: "application/pdf", upsert: true });
   if (uploadError) throw uploadError;
 
-  const { data: publicUrlData } = supabase.storage.from("certificates").getPublicUrl(path);
+  const { data: publicUrlData } = supabase.storage.from(CERTIFICATES_BUCKET).getPublicUrl(path);
 
   await tx.certificate.create({
     data: {
@@ -137,4 +174,40 @@ export async function maybeIssueCertificate(
   });
 
   return { issued: true };
+}
+
+// Fire-and-forget alert so a broken admin-uploaded template doesn't fail
+// silently — mirrors sendMail's own "never fail the caller" convention, so a
+// failed alert email can't itself block certificate issuance.
+async function notifyAdminOfRenderFailure(params: {
+  tenantId: string;
+  supportEmail: string | null;
+  user: { name: string; email: string };
+  course: { title: string };
+  certificateCode: string;
+  error: unknown;
+}): Promise<void> {
+  if (!params.supportEmail) return;
+
+  try {
+    const branding = await getBranding();
+    const message = params.error instanceof Error ? params.error.message : String(params.error);
+    const body = `
+      <p><strong>A certificate template failed to render.</strong> The student still received a certificate (using the default plain design), but the branded template needs attention.</p>
+      <p>
+        Student: ${params.user.name} (${params.user.email})<br />
+        Course: ${params.course.title}<br />
+        Certificate ID: ${params.certificateCode}<br />
+        Time: ${new Date().toLocaleString()}
+      </p>
+      <p>Error: ${message}</p>
+    `;
+    await sendMail({
+      to: params.supportEmail,
+      subject: "Certificate generation failed",
+      html: wrapEmailHtml(body, branding),
+    });
+  } catch (emailError) {
+    console.error("Failed to send certificate-render-failure alert email", emailError);
+  }
 }

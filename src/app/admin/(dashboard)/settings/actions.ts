@@ -175,6 +175,33 @@ export async function uploadLogo(
   return { success: true };
 }
 
+export async function saveCertificateTemplate(
+  _prevState: SettingsActionState,
+  formData: FormData,
+): Promise<SettingsActionState> {
+  await requireAdmin();
+  const tenantId = await getTenantId();
+
+  const file = formData.get("templateFile");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Upload an .html file." };
+  }
+
+  const html = (await file.text()).trim();
+  if (!html || !/<[a-z][\s\S]*>/i.test(html)) {
+    return { error: "This doesn't look like HTML markup." };
+  }
+
+  await prisma.settings.upsert({
+    where: { tenantId },
+    create: { tenantId, certificateTemplateHtml: html },
+    update: { certificateTemplateHtml: html },
+  });
+
+  revalidatePath("/admin/settings");
+  return { success: true };
+}
+
 export async function saveRazorpaySettings(
   _prevState: SettingsActionState,
   formData: FormData,
