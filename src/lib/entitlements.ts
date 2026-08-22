@@ -16,6 +16,19 @@ export type GrantCourseAccessParams = {
   accessEndAt: Date | null;
   accessDurationMonths: number | null;
   isPermanent: boolean;
+  // Overrides enrolledAt for a brand-new Enrollment row — used by legacy-platform
+  // CSV imports to preserve the student's original signup date instead of the
+  // import date. Defaults to startAt. Never applied to an existing enrollment.
+  enrolledAt?: Date;
+  // Read-only completion snapshot from a legacy platform, set only when creating
+  // a brand-new Enrollment row (see legacy* fields on the Enrollment model).
+  legacy?: {
+    progressPercent: number;
+    lessonsCompleted: number;
+    lessonsTotal: number;
+    quizzesCompleted: number;
+    quizzesTotal: number;
+  };
 };
 
 // Upserts the Enrollment row — merging into any existing access window and
@@ -39,6 +52,7 @@ export async function grantCourseAccess(tx: Tx, params: GrantCourseAccessParams)
         userId: params.userId,
         courseId: params.courseId,
         status: "ACTIVE",
+        enrolledAt: params.enrolledAt ?? params.startAt,
         accessStartAt: params.startAt,
         accessEndAt: params.accessEndAt,
         accessDurationMonths: params.accessDurationMonths,
@@ -46,6 +60,11 @@ export async function grantCourseAccess(tx: Tx, params: GrantCourseAccessParams)
         source: params.source,
         sourceBundleId: params.sourceBundleId,
         sourceOrderId: params.sourceOrderId,
+        legacyProgressPercent: params.legacy?.progressPercent,
+        legacyLessonsCompleted: params.legacy?.lessonsCompleted,
+        legacyLessonsTotal: params.legacy?.lessonsTotal,
+        legacyQuizzesCompleted: params.legacy?.quizzesCompleted,
+        legacyQuizzesTotal: params.legacy?.quizzesTotal,
       },
     });
     enrollmentId = created.id;

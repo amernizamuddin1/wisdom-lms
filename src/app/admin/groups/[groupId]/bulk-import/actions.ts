@@ -14,10 +14,19 @@ import { grantCourseAccess } from "@/lib/entitlements";
 // Next.js version/platform (EISDIR on readlink), unrelated to route content.
 export async function downloadGroupCsvTemplate(groupId: string): Promise<string> {
   await requireGroupAccess(groupId);
-  const header = ["full_name", "email", "phone", "course_title"];
+  const header = [
+    "full_name",
+    "email",
+    "phone",
+    "course_title",
+    "register_date",
+    "course_progress",
+    "lesson",
+    "quiz",
+  ];
   const sampleRows = [
-    ["Jane Doe", "jane.doe@example.com", "+91 9876543210", "Intro to Investing"],
-    ["John Smith", "john.smith@example.com", "", ""],
+    ["Jane Doe", "jane.doe@example.com", "+91 9876543210", "Intro to Investing", "01 Jan 2026", "40%", "4/10", "1/2"],
+    ["John Smith", "john.smith@example.com", "", "", "", "", "", ""],
   ];
   return buildCsv([header, ...sampleRows]);
 }
@@ -25,6 +34,20 @@ export async function downloadGroupCsvTemplate(groupId: string): Promise<string>
 const REQUIRED_COLUMNS = ["full_name", "email"];
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PROGRESS_RE = /^(\d{1,3})%$/;
+const FRACTION_RE = /^(\d+)\/(\d+)$/;
+
+// Optional columns for migrating enrollment history from a legacy platform —
+// see the legacy* snapshot fields on the Enrollment model. Only meaningful
+// (and only validated) alongside a course_title on the same row.
+interface LegacySnapshot {
+  enrolledAt: Date;
+  progressPercent: number;
+  lessonsCompleted: number;
+  lessonsTotal: number;
+  quizzesCompleted: number;
+  quizzesTotal: number;
+}
 
 export interface ParsedGroupRow {
   rowNumber: number;
@@ -32,6 +55,7 @@ export interface ParsedGroupRow {
   email: string;
   phone: string;
   courseTitle: string;
+  legacy: LegacySnapshot | null;
   errors: string[];
   existsAlready: boolean;
   alreadyInGroup: boolean;
@@ -125,6 +149,46 @@ async function parseAndValidate(
       else if (matches.length > 1) errors.push(`Multiple published courses titled "${courseTitle}" — ambiguous.`);
     }
 
+    let legacy: LegacySnapshot | null = null;
+    const registerDateRaw = get(row, "register_date");
+    const courseProgressRaw = get(row, "course_progress");
+    const lessonRaw = get(row, "lesson");
+    const quizRaw = get(row, "quiz");
+    const hasLegacyColumns = registerDateRaw || courseProgressRaw || lessonRaw || quizRaw;
+
+    if (hasLegacyColumns && !courseTitle) {
+      errors.push("register_date/course_progress/lesson/quiz require a course_title on the same row.");
+    } else if (hasLegacyColumns && courseTitle) {
+      const enrolledAt = new Date(registerDateRaw);
+      const progressMatch = PROGRESS_RE.exec(courseProgressRaw);
+      const lessonMatch = FRACTION_RE.exec(lessonRaw);
+      const quizMatch = FRACTION_RE.exec(quizRaw);
+
+      if (!registerDateRaw || Number.isNaN(enrolledAt.getTime())) {
+        errors.push(`register_date "${registerDateRaw}" is not a valid date.`);
+      }
+      if (!progressMatch || Number(progressMatch[1]) > 100) {
+        errors.push(`course_progress "${courseProgressRaw}" must look like "40%" (0-100).`);
+      }
+      if (!lessonMatch || Number(lessonMatch[1]) > Number(lessonMatch[2])) {
+        errors.push(`lesson "${lessonRaw}" must look like "4/10" with completed <= total.`);
+      }
+      if (!quizMatch || Number(quizMatch[1]) > Number(quizMatch[2])) {
+        errors.push(`quiz "${quizRaw}" must look like "1/2" with completed <= total.`);
+      }
+
+      if (progressMatch && lessonMatch && quizMatch && !Number.isNaN(enrolledAt.getTime())) {
+        legacy = {
+          enrolledAt,
+          progressPercent: Number(progressMatch[1]),
+          lessonsCompleted: Number(lessonMatch[1]),
+          lessonsTotal: Number(lessonMatch[2]),
+          quizzesCompleted: Number(quizMatch[1]),
+          quizzesTotal: Number(quizMatch[2]),
+        };
+      }
+    }
+
     let existsAlready = false;
     let alreadyInGroup = false;
     if (email && EMAIL_RE.test(email)) {
@@ -145,6 +209,7 @@ async function parseAndValidate(
       email,
       phone,
       courseTitle,
+      legacy,
       errors,
       existsAlready,
       alreadyInGroup,
@@ -236,6 +301,16 @@ export async function confirmGroupImport(
             accessEndAt: access.accessEndAt,
             accessDurationMonths: access.accessDurationMonths,
             isPermanent: access.isPermanent,
+            enrolledAt: row.legacy?.enrolledAt,
+            legacy: row.legacy
+              ? {
+                  progressPercent: row.legacy.progressPercent,
+                  lessonsCompleted: row.legacy.lessonsCompleted,
+                  lessonsTotal: row.legacy.lessonsTotal,
+                  quizzesCompleted: row.legacy.quizzesCompleted,
+                  quizzesTotal: row.legacy.quizzesTotal,
+                }
+              : undefined,
           });
         }
       });

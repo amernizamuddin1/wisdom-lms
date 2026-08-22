@@ -725,6 +725,16 @@ model Enrollment {
   sourceOrderId  String?          @map("source_order_id")
   sourceOrder    Order?           @relation(fields: [sourceOrderId], references: [id], onDelete: SetNull)
 
+  // Historical completion snapshot from a legacy platform, captured at CSV
+  // import time (see EnrollmentSource.CSV_IMPORT). Not derived from
+  // LessonProgress/QuizAttempt — this course may have no real lessons yet.
+  // Null for every enrollment that wasn't legacy-imported.
+  legacyProgressPercent  Int? @map("legacy_progress_percent")
+  legacyLessonsCompleted Int? @map("legacy_lessons_completed")
+  legacyLessonsTotal     Int? @map("legacy_lessons_total")
+  legacyQuizzesCompleted Int? @map("legacy_quizzes_completed")
+  legacyQuizzesTotal     Int? @map("legacy_quizzes_total")
+
   grants EnrollmentGrant[]
 
   @@unique([userId, courseId])
