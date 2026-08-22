@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { gradeAnswer, type GivenAnswer } from "@/lib/grading";
 import { Prisma } from "@/generated/prisma/client";
 import { recordQuizAttempt } from "@/lib/gamification/events";
+import { maybeIssueCertificate } from "@/lib/gamification/certificates";
 import { getTenantId } from "@/lib/tenant-context";
 
 export async function submitQuizAttempt(quizId: string, formData: FormData) {
@@ -55,6 +56,8 @@ export async function submitQuizAttempt(quizId: string, formData: FormData) {
 
   const courseId = quiz.courseId ?? quiz.chapter?.courseId;
 
+  let courseNewlyCompletedId: string | undefined;
+
   const attempt = await prisma.$transaction(async (tx) => {
     const created = await tx.quizAttempt.create({
       data: { tenantId, userId: user.id, quizId, score, passed },
@@ -72,7 +75,7 @@ export async function submitQuizAttempt(quizId: string, formData: FormData) {
     });
 
     if (courseId) {
-      await recordQuizAttempt(tx, {
+      const result = await recordQuizAttempt(tx, {
         userId: user.id,
         courseId,
         chapterId: quiz.chapterId,
@@ -81,10 +84,23 @@ export async function submitQuizAttempt(quizId: string, formData: FormData) {
         score,
         passed,
       });
+      courseNewlyCompletedId = result.courseNewlyCompletedId;
     }
 
     return created;
   });
+
+  // Certificate issuance renders a PDF via a real headless browser, which
+  // routinely exceeds Prisma's 5s interactive-transaction timeout — kept out
+  // of the transaction above and run separately, in its own transaction with
+  // a much longer timeout, so a slow render can't silently roll back the
+  // quiz attempt/completion/XP writes that already committed.
+  if (courseNewlyCompletedId) {
+    await prisma.$transaction(
+      (tx) => maybeIssueCertificate(tx, { userId: user.id, courseId: courseNewlyCompletedId! }),
+      { timeout: 30_000 },
+    );
+  }
 
   redirect(`/quiz/${quizId}/results/${attempt.id}`);
 }

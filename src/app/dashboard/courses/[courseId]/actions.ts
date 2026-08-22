@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser, getOptionalUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { recordLessonCompleted, recordLearningHeartbeat } from "@/lib/gamification/events";
+import { maybeIssueCertificate } from "@/lib/gamification/certificates";
 import { getTenantId } from "@/lib/tenant-context";
 
 export async function markLessonComplete(courseId: string, lessonId: string) {
@@ -35,9 +36,22 @@ export async function markLessonComplete(courseId: string, lessonId: string) {
   // logic. recordLessonCompleted is itself dedupe-safe for XP, but skipping
   // the call entirely here avoids the redundant completion/achievement scan.
   if (!alreadyCompleted?.completedAt) {
-    await prisma.$transaction((tx) =>
+    const result = await prisma.$transaction((tx) =>
       recordLessonCompleted(tx, { userId: user.id, courseId, chapterId: lesson.chapterId, lessonId }),
     );
+
+    // Certificate issuance renders a PDF via a real headless browser, which
+    // routinely exceeds Prisma's 5s interactive-transaction timeout — kept
+    // out of the transaction above and run separately, in its own
+    // transaction with a much longer timeout, so a slow render can't
+    // silently roll back the completion/XP/achievement writes that already
+    // committed.
+    if (result.courseNewlyCompletedId) {
+      await prisma.$transaction(
+        (tx) => maybeIssueCertificate(tx, { userId: user.id, courseId: result.courseNewlyCompletedId! }),
+        { timeout: 30_000 },
+      );
+    }
   }
 
   revalidatePath(`/dashboard/courses/${courseId}`);

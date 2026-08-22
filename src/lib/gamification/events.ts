@@ -5,7 +5,6 @@ import { getDateKeyForUser } from "./timezone";
 import { awardXp, awardQuizScoreTierXp, getRuleXpAmount } from "./xp";
 import { recordQualifyingDay } from "./streaks";
 import { checkModuleAndCourseCompletion } from "./completion";
-import { maybeIssueCertificate } from "./certificates";
 import { evaluateAchievements, type UnlockedAchievement } from "./achievements";
 import { getTenantId } from "@/lib/tenant-context";
 
@@ -13,7 +12,20 @@ import type { PrismaTransaction } from "@/lib/prisma";
 
 type Tx = PrismaTransaction;
 
-export type GamificationResult = { newlyUnlockedAchievements: UnlockedAchievement[] };
+// courseNewlyCompletedId, when set, tells the caller to issue a certificate
+// for that course — deliberately *not* done here. maybeIssueCertificate
+// launches a real headless browser and renders a PDF, which routinely takes
+// longer than Prisma's 5s interactive-transaction timeout; running it inside
+// this function's transaction intermittently kills the whole transaction
+// with "query cannot be executed on an expired transaction" partway through
+// certificate issuance, silently dropping the certificate (and everything
+// else in the transaction) with no error surfaced to the user. The caller
+// must call maybeIssueCertificate itself, after this transaction has
+// committed, in its own transaction with a longer timeout.
+export type GamificationResult = {
+  newlyUnlockedAchievements: UnlockedAchievement[];
+  courseNewlyCompletedId?: string;
+};
 
 async function bumpDailyActivity(
   tx: Tx,
@@ -146,14 +158,12 @@ export async function recordLessonCompleted(
     courseId: params.courseId,
   });
   if (completion.newlyCompletedChapterIds.length > 0) relevantKinds.push("MODULE_COUNT", "FAST_STARTER");
-  if (completion.courseNewlyCompleted) {
-    relevantKinds.push("COURSE_COUNT");
-    await maybeIssueCertificate(tx, { userId: params.userId, courseId: params.courseId });
-  }
+  const courseNewlyCompletedId = completion.courseNewlyCompleted ? params.courseId : undefined;
+  if (courseNewlyCompletedId) relevantKinds.push("COURSE_COUNT");
 
-  if (relevantKinds.length === 0) return { newlyUnlockedAchievements: [] };
+  if (relevantKinds.length === 0) return { newlyUnlockedAchievements: [], courseNewlyCompletedId };
   const unlocked = await evaluateAchievements(tx, { userId: params.userId, relevantKinds });
-  return { newlyUnlockedAchievements: unlocked };
+  return { newlyUnlockedAchievements: unlocked, courseNewlyCompletedId };
 }
 
 // The single entry point for "a quiz attempt was just submitted." Always
@@ -233,6 +243,7 @@ export async function recordQuizAttempt(
     if (streakResult.milestonesCrossed.length > 0) relevantKinds.push("STREAK_DAYS", "WEEKEND_STREAK");
   }
 
+  let courseNewlyCompletedId: string | undefined;
   if (params.passed) {
     const completion = await checkModuleAndCourseCompletion(tx, {
       userId: params.userId,
@@ -240,18 +251,18 @@ export async function recordQuizAttempt(
     });
     if (completion.newlyCompletedChapterIds.length > 0) relevantKinds.push("MODULE_COUNT", "FAST_STARTER");
     if (completion.courseNewlyCompleted) {
+      courseNewlyCompletedId = params.courseId;
       relevantKinds.push("COURSE_COUNT");
-      await maybeIssueCertificate(tx, { userId: params.userId, courseId: params.courseId });
     }
   }
 
-  if (relevantKinds.length === 0) return { newlyUnlockedAchievements: [] };
+  if (relevantKinds.length === 0) return { newlyUnlockedAchievements: [], courseNewlyCompletedId };
   const unlocked = await evaluateAchievements(tx, {
     userId: params.userId,
     relevantKinds,
     quizId: params.quizId,
   });
-  return { newlyUnlockedAchievements: unlocked };
+  return { newlyUnlockedAchievements: unlocked, courseNewlyCompletedId };
 }
 
 // The single entry point for the client learning-time heartbeat. Caps
